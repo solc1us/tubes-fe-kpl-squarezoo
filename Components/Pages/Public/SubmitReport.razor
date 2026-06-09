@@ -1,7 +1,52 @@
 @page "/lapor"
-@layout EmptyLayout
+@layout PublicLayout
 
-<h1>Ajukan Laporan</h1>
-<p>Halaman ini digunakan pelapor untuk mengirim laporan tanpa login.</p>
+<section class="py-4">
+    <div class="mb-4">
+        <h1>Ajukan Laporan</h1>
+        <p class="lead">Form placeholder untuk pelapor tamu sebelum integrasi API.</p>
+    </div>
 
-@* TODO: Integrate POST /api/reports. *@
+    <form class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label" for="reporterName">Nama pelapor</label>
+            <input id="reporterName" class="form-control" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label" for="reporterPhone">Nomor HP pelapor</label>
+            <input id="reporterPhone" class="form-control" />
+        </div>
+
+        <div class="col-12">
+            <label class="form-label" for="reportTitle">Judul laporan</label>
+            <input id="reportTitle" class="form-control" />
+        </div>
+
+        <div class="col-12">
+            <label class="form-label" for="chronology">Kronologi</label>
+            <textarea id="chronology" class="form-control" rows="5"></textarea>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label" for="reportedParty">Pihak terlapor</label>
+            <input id="reportedParty" class="form-control" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label" for="incidentLocation">Lokasi kejadian</label>
+            <input id="incidentLocation" class="form-control" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label" for="incidentDate">Tanggal kejadian</label>
+            <input id="incidentDate" class="form-control" type="date" />
+        </div>
+
+        <div class="col-12">
+            <button class="btn btn-primary" type="button">Kirim Laporan</button>
+        </div>
+    </form>
+</section>
+
+@* TODO: Integrate POST /api/reports *@

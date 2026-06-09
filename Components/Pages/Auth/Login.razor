@@ -2,22 +2,26 @@
 @layout EmptyLayout
 @inject NavigationManager Navigation
 
-<main class="container py-5">
-    <section class="mx-auto" style="max-width: 420px;">
-        <h1>Login</h1>
-        <p>Placeholder login untuk Admin dan Pimpinan.</p>
+<main class="login-page">
+    <section class="login-card">
+        <a class="login-back" href="/">← Kembali</a>
 
-        <div class="mb-3">
-            <label class="form-label" for="noHP">No HP</label>
-            <input id="noHP" class="form-control" />
+        <div class="login-heading">
+            <h1>Login</h1>
+            <p>Masuk sebagai Admin atau Pimpinan untuk mengelola laporan.</p>
         </div>
 
-        <div class="mb-3">
-            <label class="form-label" for="password">Password</label>
-            <input id="password" class="form-control" type="password" />
+        <div class="login-field">
+            <label for="noHP">No HP</label>
+            <input id="noHP" type="text" placeholder="Masukkan nomor HP" />
         </div>
 
-        <button class="btn btn-primary" @onclick="GoToDashboard">Login</button>
+        <div class="login-field">
+            <label for="password">Password</label>
+            <input id="password" type="password" placeholder="Masukkan password" />
+        </div>
+
+        <button class="login-button" type="button" @onclick="GoToDashboard">Login</button>
 
         @* TODO: Integrate real authentication flow later. *@
     </section>
