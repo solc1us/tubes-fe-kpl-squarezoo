@@ -1,6 +1,8 @@
 @page "/login"
 @layout EmptyLayout
+@rendermode InteractiveServer
 @inject NavigationManager Navigation
+@inject IHttpClientFactory HttpClientFactory
 
 <main class="login-page">
     <section class="login-card">
@@ -13,23 +15,121 @@
 
         <div class="login-field">
             <label for="noHP">No HP</label>
-            <input id="noHP" type="text" placeholder="Masukkan nomor HP" />
+            <input
+                id="noHP"
+                type="text"
+                placeholder="Masukkan nomor HP"
+                @bind="noHP"
+                @bind:event="oninput" />
         </div>
 
         <div class="login-field">
             <label for="password">Password</label>
-            <input id="password" type="password" placeholder="Masukkan password" />
+            <input
+                id="password"
+                type="password"
+                placeholder="Masukkan password"
+                @bind="password"
+                @bind:event="oninput" />
         </div>
 
-        <button class="login-button" type="button" @onclick="GoToDashboard">Login</button>
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="login-error">
+                @errorMessage
+            </div>
+        }
 
-        @* TODO: Integrate real authentication flow later. *@
+        <button
+            class="login-button"
+            type="button"
+            disabled="@isLoading"
+            @onclick="HandleLogin">
+            @(isLoading ? "Memproses..." : "Login")
+        </button>
     </section>
 </main>
 
 @code {
-    private void GoToDashboard()
+    private string noHP = string.Empty;
+    private string password = string.Empty;
+    private string? errorMessage;
+    private bool isLoading;
+
+    private const string LoginEndpoint = "http://localhost:5191/api/users/login";
+
+    private async Task HandleLogin()
     {
-        Navigation.NavigateTo("/admin/dashboard");
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(noHP) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "No HP dan password wajib diisi.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+
+            var request = new LoginRequest(noHP, password);
+            var response = await client.PostAsJsonAsync(LoginEndpoint, request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "No HP atau password salah.";
+                return;
+            }
+
+            var loginResult = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+            if (loginResult is null)
+            {
+                errorMessage = "Response login tidak valid.";
+                return;
+            }
+
+            if (loginResult.Role == 1)
+            {
+                Navigation.NavigateTo("/admin/dashboard");
+                return;
+            }
+
+            if (loginResult.Role == 2)
+            {
+                Navigation.NavigateTo("/pimpinan/dashboard");
+                return;
+            }
+
+            errorMessage = "Role tidak dikenali.";
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request login terlalu lama.";
+        }
+        catch
+        {
+            errorMessage = "Terjadi kesalahan saat login.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
+
+    private sealed record LoginRequest(string NoHP, string Password);
+
+    private sealed record LoginResponse(
+        Guid UserId,
+        string Name,
+        string NoHP,
+        int Role,
+        List<string> Permissions
+    );
 }
