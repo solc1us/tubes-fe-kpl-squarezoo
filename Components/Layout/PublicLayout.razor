@@ -1,7 +1,18 @@
 @inherits Microsoft.AspNetCore.Components.LayoutComponentBase
 
 <div class="public-layout">
-    <AppNavbar />
+    <header class="border-bottom bg-white">
+        <nav class="container d-flex flex-wrap align-items-center justify-content-between gap-3 py-3">
+            <a class="navbar-brand fw-semibold text-decoration-none" href="/">Lapor-U</a>
+
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <a class="text-decoration-none" href="/lapor">Ajukan Laporan</a>
+                <a class="text-decoration-none" href="/lacak">Lacak Laporan</a>
+                <a class="text-decoration-none" href="/lapor/evidence">Tambah Bukti</a>
+                <a class="text-decoration-none" href="/login">Login</a>
+            </div>
+        </nav>
+    </header>
 
     <main class="container py-4">
         @Body

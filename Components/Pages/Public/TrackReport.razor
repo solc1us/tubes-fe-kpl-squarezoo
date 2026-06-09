@@ -1,0 +1,27 @@
+@page "/lacak"
+@layout PublicLayout
+
+<section class="py-4">
+    <div class="mb-4">
+        <h1>Lacak Laporan</h1>
+        <p class="lead">Masukkan Report ID dan PIN untuk melihat status laporan.</p>
+    </div>
+
+    <form class="row g-3" style="max-width: 560px;">
+        <div class="col-12">
+            <label class="form-label" for="reportId">Report ID</label>
+            <input id="reportId" class="form-control" />
+        </div>
+
+        <div class="col-12">
+            <label class="form-label" for="pin">PIN</label>
+            <input id="pin" class="form-control" />
+        </div>
+
+        <div class="col-12">
+            <button class="btn btn-primary" type="button">Lacak Status</button>
+        </div>
+    </form>
+</section>
+
+@* TODO: Integrate POST /api/reports/track *@

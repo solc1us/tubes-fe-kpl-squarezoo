@@ -1,23 +1,115 @@
 @page "/"
-@layout EmptyLayout
+@layout PublicLayout
 
-<header class="d-flex align-items-center justify-content-between border-bottom px-4 py-3">
-    <a class="navbar-brand fw-semibold" href="/">Lapor-U</a>
+<div class="landing-page">
+    <section class="landing-hero">
+        <div class="landing-hero-copy">
+            <p class="landing-badge">Pelaporan publik terstruktur</p>
+            <h1>Lapor-U</h1>
+            <p class="landing-lead">
+                Platform pelaporan dan pemantauan kasus secara aman, terstruktur, dan mudah digunakan.
+            </p>
 
-    <nav class="d-flex gap-3">
-        <a href="/login">Login</a>
-        <a href="/register">Register</a>
-    </nav>
-</header>
+            <div class="landing-actions">
+                <a class="landing-button landing-button-primary" href="/lapor">Ajukan Laporan</a>
+                <a class="landing-button landing-button-secondary" href="/lacak">Lacak Laporan</a>
+            </div>
+        </div>
 
-<main class="container py-5">
-    <section class="py-5">
-        <h1>Lapor-U</h1>
-        <p class="lead">Platform pelaporan dan manajemen kasus untuk lingkungan kampus.</p>
+        <aside class="landing-status-card" aria-label="Contoh status laporan">
+            <div class="landing-status-header">
+                <span>Contoh Status</span>
+                <strong>LP-2026-014</strong>
+            </div>
 
-        <div class="d-flex gap-3">
-            <a class="btn btn-primary" href="/login">Login</a>
-            <a class="btn btn-outline-primary" href="/register">Register</a>
+            <div class="landing-status-list">
+                <div class="landing-status-item is-done">
+                    <span class="landing-status-dot"></span>
+                    <div>
+                        <strong>Diterima</strong>
+                        <p>Laporan berhasil tercatat.</p>
+                    </div>
+                </div>
+
+                <div class="landing-status-item is-active">
+                    <span class="landing-status-dot"></span>
+                    <div>
+                        <strong>Diproses</strong>
+                        <p>Tim sedang meninjau laporan.</p>
+                    </div>
+                </div>
+
+                <div class="landing-status-item">
+                    <span class="landing-status-dot"></span>
+                    <div>
+                        <strong>Selesai</strong>
+                        <p>Hasil tindak lanjut tersedia.</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </section>
+
+    <section class="landing-section">
+        <div class="landing-section-heading">
+            <p>Fitur utama</p>
+            <h2>Dibuat untuk alur pelaporan yang jelas</h2>
+        </div>
+
+        <div class="landing-card-grid">
+            <article class="landing-card">
+                <h3>Pelaporan Mudah</h3>
+                <p>Form sederhana membantu pelapor menyampaikan informasi awal dengan jelas.</p>
+            </article>
+
+            <article class="landing-card">
+                <h3>Tracking Status</h3>
+                <p>Pelapor dapat mengecek perkembangan laporan menggunakan Report ID dan PIN.</p>
+            </article>
+
+            <article class="landing-card">
+                <h3>Bukti Pendukung</h3>
+                <p>Tambahkan testimoni, kronologi tambahan, atau catatan pendukung saat diperlukan.</p>
+            </article>
         </div>
     </section>
-</main>
+
+    <section class="landing-section">
+        <div class="landing-section-heading">
+            <p>Cara kerja</p>
+            <h2>Tiga langkah untuk memantau laporan</h2>
+        </div>
+
+        <div class="landing-steps">
+            <article class="landing-step">
+                <span>1</span>
+                <h3>Isi laporan</h3>
+                <p>Lengkapi informasi pelapor, kronologi, pihak terlapor, lokasi, dan tanggal kejadian.</p>
+            </article>
+
+            <article class="landing-step">
+                <span>2</span>
+                <h3>Simpan ID dan PIN</h3>
+                <p>Gunakan data tersebut sebagai akses untuk melacak perkembangan laporan.</p>
+            </article>
+
+            <article class="landing-step">
+                <span>3</span>
+                <h3>Lacak status</h3>
+                <p>Pantau tindak lanjut laporan melalui halaman pelacakan publik.</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="landing-final-cta">
+        <div>
+            <p>Mulai dari sini</p>
+            <h2>Ajukan laporan baru atau lacak laporan yang sudah dikirim.</h2>
+        </div>
+
+        <div class="landing-actions">
+            <a class="landing-button landing-button-primary" href="/lapor">Ajukan Laporan</a>
+            <a class="landing-button landing-button-secondary" href="/lacak">Lacak Laporan</a>
+        </div>
+    </section>
+</div>

@@ -1,0 +1,43 @@
+@page "/lapor/evidence"
+@layout PublicLayout
+
+<section class="py-4">
+    <div class="mb-4">
+        <h1>Tambah Bukti</h1>
+        <p class="lead">Form placeholder untuk menambahkan bukti teks pada laporan yang sudah dibuat.</p>
+    </div>
+
+    <form class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label" for="reportId">Report ID</label>
+            <input id="reportId" class="form-control" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label" for="pin">PIN</label>
+            <input id="pin" class="form-control" />
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label" for="evidenceType">Evidence Type</label>
+            <input id="evidenceType" class="form-control" />
+            <div class="form-text">0 = Testimoni, 1 = KronologiTambahan, 2 = CatatanPendukung</div>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label" for="content">Content</label>
+            <textarea id="content" class="form-control" rows="4"></textarea>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label" for="description">Description</label>
+            <textarea id="description" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="col-12">
+            <button class="btn btn-primary" type="button">Tambah Bukti</button>
+        </div>
+    </form>
+</section>
+
+@* TODO: Integrate POST /api/reports/{id}/evidences *@
