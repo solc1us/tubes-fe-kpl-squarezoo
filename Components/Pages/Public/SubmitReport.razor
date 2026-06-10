@@ -1,52 +1,246 @@
 @page "/lapor"
 @layout PublicLayout
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
 
-<section class="py-4">
-    <div class="mb-4">
-        <h1>Ajukan Laporan</h1>
-        <p class="lead">Form placeholder untuk pelapor tamu sebelum integrasi API.</p>
-    </div>
-
-    <form class="row g-3">
-        <div class="col-md-6">
-            <label class="form-label" for="reporterName">Nama pelapor</label>
-            <input id="reporterName" class="form-control" />
+<section class="report-page">
+    @if (submitResult is null)
+    {
+        <div class="report-heading">
+            <p class="report-badge">Form pelaporan publik</p>
+            <h1>Ajukan Laporan</h1>
+            <p class="report-lead">
+                Lengkapi data di bawah ini. Setelah laporan terkirim, kamu akan menerima
+                Report ID dan PIN untuk melacak status laporan.
+            </p>
         </div>
 
-        <div class="col-md-6">
-            <label class="form-label" for="reporterPhone">Nomor HP pelapor</label>
-            <input id="reporterPhone" class="form-control" />
-        </div>
+        <div class="report-card">
+            <div class="report-grid">
+                <div class="report-field">
+                    <label for="reporterName">Nama pelapor</label>
+                    <input
+                        id="reporterName"
+                        type="text"
+                        placeholder="Masukkan nama lengkap"
+                        @bind="reporterName"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-12">
-            <label class="form-label" for="reportTitle">Judul laporan</label>
-            <input id="reportTitle" class="form-control" />
-        </div>
+                <div class="report-field">
+                    <label for="reporterNoHP">Nomor HP pelapor</label>
+                    <input
+                        id="reporterNoHP"
+                        type="tel"
+                        placeholder="08xxxxxxxxxx"
+                        @bind="reporterNoHP"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-12">
-            <label class="form-label" for="chronology">Kronologi</label>
-            <textarea id="chronology" class="form-control" rows="5"></textarea>
-        </div>
+                <div class="report-field report-field-full">
+                    <label for="title">Judul laporan</label>
+                    <input
+                        id="title"
+                        type="text"
+                        placeholder="Ringkasan singkat kejadian"
+                        @bind="title"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-md-6">
-            <label class="form-label" for="reportedParty">Pihak terlapor</label>
-            <input id="reportedParty" class="form-control" />
-        </div>
+                <div class="report-field report-field-full">
+                    <label for="description">Kronologi</label>
+                    <textarea
+                        id="description"
+                        rows="5"
+                        placeholder="Ceritakan kronologi kejadian secara runtut"
+                        @bind="description"
+                        @bind:event="oninput"></textarea>
+                </div>
 
-        <div class="col-md-6">
-            <label class="form-label" for="incidentLocation">Lokasi kejadian</label>
-            <input id="incidentLocation" class="form-control" />
-        </div>
+                <div class="report-field">
+                    <label for="reportedPerson">Pihak terlapor</label>
+                    <input
+                        id="reportedPerson"
+                        type="text"
+                        placeholder="Nama pihak yang dilaporkan"
+                        @bind="reportedPerson"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-md-6">
-            <label class="form-label" for="incidentDate">Tanggal kejadian</label>
-            <input id="incidentDate" class="form-control" type="date" />
-        </div>
+                <div class="report-field">
+                    <label for="location">Lokasi kejadian</label>
+                    <input
+                        id="location"
+                        type="text"
+                        placeholder="Contoh: Gedung Rektorat"
+                        @bind="location"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-12">
-            <button class="btn btn-primary" type="button">Kirim Laporan</button>
+                <div class="report-field">
+                    <label for="incidentDate">Tanggal &amp; waktu kejadian</label>
+                    <input
+                        id="incidentDate"
+                        type="datetime-local"
+                        @bind="incidentDate" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="report-error">
+                    @errorMessage
+                </div>
+            }
+
+            <button
+                class="report-submit"
+                type="button"
+                disabled="@isLoading"
+                @onclick="HandleSubmit">
+                @(isLoading ? "Mengirim..." : "Kirim Laporan")
+            </button>
         </div>
-    </form>
+    }
+    else
+    {
+        <div class="report-card report-success">
+            <div class="report-success-icon">✓</div>
+            <h1>Laporan Berhasil Dikirim</h1>
+            <p class="report-lead">
+                Simpan Report ID dan PIN di bawah ini. Keduanya dibutuhkan untuk melacak
+                status laporan dan menambahkan bukti.
+            </p>
+
+            <div class="report-credentials">
+                <div class="report-credential">
+                    <span>Report ID</span>
+                    <strong>@submitResult.ReportId</strong>
+                </div>
+                <div class="report-credential">
+                    <span>Tracking PIN</span>
+                    <strong>@submitResult.TrackingPin</strong>
+                </div>
+            </div>
+
+            <div class="report-success-actions">
+                <a class="landing-button landing-button-primary" href="/lacak">Lacak Laporan</a>
+                <button class="landing-button landing-button-secondary" type="button" @onclick="ResetForm">
+                    Buat Laporan Baru
+                </button>
+            </div>
+        </div>
+    }
 </section>
 
-@* TODO: Integrate POST /api/reports *@
+@code {
+    private string reporterName = string.Empty;
+    private string reporterNoHP = string.Empty;
+    private string title = string.Empty;
+    private string description = string.Empty;
+    private string reportedPerson = string.Empty;
+    private string location = string.Empty;
+    private DateTime? incidentDate;
+
+    private string? errorMessage;
+    private bool isLoading;
+    private CreateReportResponse? submitResult;
+
+    private const string ReportsEndpoint = "http://localhost:5191/api/reports";
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(reporterName)
+            || string.IsNullOrWhiteSpace(reporterNoHP)
+            || string.IsNullOrWhiteSpace(title)
+            || string.IsNullOrWhiteSpace(description)
+            || string.IsNullOrWhiteSpace(reportedPerson)
+            || string.IsNullOrWhiteSpace(location)
+            || incidentDate is null)
+        {
+            errorMessage = "Semua field wajib diisi.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+
+            var request = new CreateReportRequest(
+                reporterName,
+                reporterNoHP,
+                title,
+                description,
+                reportedPerson,
+                location,
+                incidentDate.Value);
+
+            var response = await client.PostAsJsonAsync(ReportsEndpoint, request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Laporan gagal dikirim. Periksa kembali data yang diisi.";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<CreateReportResponse>();
+
+            if (result is null)
+            {
+                errorMessage = "Response server tidak valid.";
+                return;
+            }
+
+            submitResult = result;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request terlalu lama. Coba lagi.";
+        }
+        catch
+        {
+            errorMessage = "Terjadi kesalahan saat mengirim laporan.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        reporterName = string.Empty;
+        reporterNoHP = string.Empty;
+        title = string.Empty;
+        description = string.Empty;
+        reportedPerson = string.Empty;
+        location = string.Empty;
+        incidentDate = null;
+        errorMessage = null;
+        submitResult = null;
+    }
+
+    private sealed record CreateReportRequest(
+        string ReporterName,
+        string ReporterNoHP,
+        string Title,
+        string Description,
+        string ReportedPerson,
+        string Location,
+        DateTime IncidentDate
+    );
+
+    private sealed record CreateReportResponse(
+        string ReportId,
+        string TrackingPin,
+        string Message
+    );
+}
