@@ -121,11 +121,28 @@
             var request = new TrackReportRequest(reportId, pin);
             var response = await client.PostAsJsonAsync(TrackEndpoint, request);
 
+            if (!response.IsSuccessStatusCode)
+            {
+                response = await client.PostAsJsonAsync(TrackEndpoint, new { id = reportId, pin });
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                response = await client.PostAsJsonAsync(TrackEndpoint, new { report_id = reportId, pin });
+            }
+
             if (response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed
                 || response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 var queryUrl = $"{TrackEndpoint}?reportId={Uri.EscapeDataString(reportId)}&pin={Uri.EscapeDataString(pin)}";
                 response = await client.GetAsync(queryUrl);
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed
+                || response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                var altUrl = $"http://localhost:5191/api/reports/{Uri.EscapeDataString(reportId)}?pin={Uri.EscapeDataString(pin)}";
+                response = await client.GetAsync(altUrl);
             }
 
             if (!response.IsSuccessStatusCode)
@@ -146,9 +163,9 @@
                 return;
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
-            errorMessage = "Gagal terhubung ke server. Pastikan backend berjalan dan alamat API benar.";
+            errorMessage = $"Gagal terhubung ke server: {ex.Message}";
         }
         catch (TaskCanceledException)
         {
@@ -175,24 +192,59 @@
             PropertyNameCaseInsensitive = true
         };
 
-        if (System.Text.Json.JsonSerializer.Deserialize<TrackReportResponse>(content, options) is TrackReportResponse response)
+        try
         {
-            return response;
+            if (System.Text.Json.JsonSerializer.Deserialize<TrackReportResponse>(content, options) is TrackReportResponse direct)
+            {
+                return direct;
+            }
+        }
+        catch
+        {
+            // ignore direct deserialization failure and try manual parsing
         }
 
         using var document = System.Text.Json.JsonDocument.Parse(content);
         var element = document.RootElement;
 
-        if (element.TryGetProperty("data", out var dataElement))
+        if (element.ValueKind == System.Text.Json.JsonValueKind.Array && element.GetArrayLength() > 0)
         {
-            element = dataElement;
+            element = element[0];
+        }
+
+        if (element.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("data", out var dataElement))
+            {
+                element = dataElement.ValueKind == System.Text.Json.JsonValueKind.Array && dataElement.GetArrayLength() > 0
+                    ? dataElement[0]
+                    : dataElement;
+            }
+            else if (element.TryGetProperty("result", out var resultElement))
+            {
+                element = resultElement.ValueKind == System.Text.Json.JsonValueKind.Array && resultElement.GetArrayLength() > 0
+                    ? resultElement[0]
+                    : resultElement;
+            }
+            else if (element.TryGetProperty("response", out var responseElement))
+            {
+                element = responseElement.ValueKind == System.Text.Json.JsonValueKind.Array && responseElement.GetArrayLength() > 0
+                    ? responseElement[0]
+                    : responseElement;
+            }
+            else if (element.TryGetProperty("report", out var reportElement))
+            {
+                element = reportElement.ValueKind == System.Text.Json.JsonValueKind.Array && reportElement.GetArrayLength() > 0
+                    ? reportElement[0]
+                    : reportElement;
+            }
         }
 
         string reportIdValue = GetString(element, "reportId", "id", "reportID", "report_id") ?? string.Empty;
-        string statusValue = NormalizeStatus(GetString(element, "status", "statusLabel", "status_name", "statusLabelId") ?? string.Empty);
-        string titleValue = GetString(element, "title", "judul", "subject", "reportTitle") ?? "-";
-        string? trackingMessageValue = GetString(element, "trackingMessage", "message", "catatan", "note");
-        DateTime? updatedAtValue = GetDateTime(element, "updatedAt", "updated", "lastUpdated", "modifiedAt");
+        string statusValue = NormalizeStatus(GetStatusValue(element));
+        string titleValue = GetString(element, "title", "judul", "subject", "reportTitle", "report_title") ?? "-";
+        string? trackingMessageValue = GetString(element, "trackingMessage", "message", "catatan", "note", "description");
+        DateTime? updatedAtValue = GetDateTime(element, "updatedAt", "updated", "lastUpdated", "modifiedAt", "timestamp", "date");
 
         if (string.IsNullOrWhiteSpace(reportIdValue) || string.IsNullOrWhiteSpace(statusValue))
         {
@@ -200,6 +252,38 @@
         }
 
         return new TrackReportResponse(reportIdValue, statusValue, titleValue, trackingMessageValue, updatedAtValue);
+    }
+
+    private static string GetStatusValue(System.Text.Json.JsonElement element)
+    {
+        var rawStatus = GetString(element, "status", "statusLabel", "status_name", "statusLabelId", "state", "statusText");
+        if (!string.IsNullOrWhiteSpace(rawStatus))
+        {
+            return NormalizeStatus(rawStatus);
+        }
+
+        if (element.TryGetProperty("status", out var statusElement))
+        {
+            if (statusElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                var nestedStatus = GetString(statusElement, "name", "label", "text", "status", "value", "code");
+                if (!string.IsNullOrWhiteSpace(nestedStatus))
+                {
+                    return NormalizeStatus(nestedStatus);
+                }
+            }
+            else if (statusElement.ValueKind == System.Text.Json.JsonValueKind.Array && statusElement.GetArrayLength() > 0)
+            {
+                var firstItem = statusElement[0];
+                var nestedStatus = GetString(firstItem, "name", "label", "text", "status", "value", "code");
+                if (!string.IsNullOrWhiteSpace(nestedStatus))
+                {
+                    return NormalizeStatus(nestedStatus);
+                }
+            }
+        }
+
+        return string.Empty;
     }
 
     private static string? GetString(System.Text.Json.JsonElement element, params string[] names)
