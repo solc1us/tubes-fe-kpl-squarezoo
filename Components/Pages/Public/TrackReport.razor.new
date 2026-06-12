@@ -1,0 +1,218 @@
+@page "/lacak"
+@layout PublicLayout
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
+
+<section class="report-page">
+    <div class="report-heading">
+        <p class="report-badge">Pelacakan Publik</p>
+        <h1>Lacak Laporan</h1>
+        <p class="report-lead">
+            Masukkan Report ID dan PIN untuk melihat perkembangan laporan Anda secara cepat.
+        </p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="report-card">
+                @if (trackResult is null)
+                {
+                    <div class="report-grid">
+                        <div class="report-field report-field-full">
+                            <label for="reportId">Report ID</label>
+                            <input
+                                id="reportId"
+                                type="text"
+                                class="form-control"
+                                placeholder="Masukkan Report ID"
+                                @bind="reportId"
+                                @bind:event="oninput" />
+                        </div>
+
+                        <div class="report-field report-field-full">
+                            <label for="pin">PIN</label>
+                            <input
+                                id="pin"
+                                type="text"
+                                class="form-control"
+                                placeholder="Masukkan PIN"
+                                @bind="pin"
+                                @bind:event="oninput" />
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="report-error">@errorMessage</div>
+                    }
+
+                    <button
+                        class="report-submit"
+                        type="button"
+                        disabled="@isLoading"
+                        @onclick="HandleTrack">
+                        @(isLoading ? "Memproses..." : "Lacak Status")
+                    </button>
+                }
+                else
+                {
+                    <div class="report-success">
+                        <div class="report-success-icon">✓</div>
+                        <h1>Hasil Pelacakan</h1>
+                        <p class="report-lead">Status laporan Anda berhasil ditemukan.</p>
+
+                        <div class="report-credentials">
+                            <div class="report-credential">
+                                <span>Report ID</span>
+                                <strong>@trackResult.ReportId</strong>
+                            </div>
+                            <div class="report-credential">
+                                <span>Status Saat Ini</span>
+                                <strong>@trackResult.Status</strong>
+                            </div>
+                        </div>
+
+                        <div class="report-detail" style="text-align: left;">
+                            <p><strong>Judul:</strong> @trackResult.Title</p>
+                            @if (!string.IsNullOrWhiteSpace(trackResult.TrackingMessage))
+                            {
+                                <p><strong>Catatan:</strong> @trackResult.TrackingMessage</p>
+                            }
+                            @if (trackResult.UpdatedAt is not null)
+                            {
+                                <p><strong>Diperbarui:</strong> @trackResult.UpdatedAt.Value.ToString("g")</p>
+                            }
+                        </div>
+
+                        <div class="report-success-actions">
+                            <button class="landing-button landing-button-secondary" type="button" @onclick="ResetSearch">
+                                Lacak Laporan Lain
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <aside class="landing-status-card">
+                <div class="landing-status-header">
+                    <span>Dashboard Pelacakan</span>
+                    <strong>Ringkasan</strong>
+                </div>
+
+                <div class="landing-status-list">
+                    <div class="landing-status-item @(trackResult is not null && trackResult.Status == "Diterima" ? "is-done" : "")">
+                        <span class="landing-status-dot"></span>
+                        <div>
+                            <strong>Diterima</strong>
+                            <p>Laporan berhasil tercatat dalam sistem.</p>
+                        </div>
+                    </div>
+
+                    <div class="landing-status-item @(trackResult is not null && trackResult.Status == "Diproses" ? "is-active" : "")">
+                        <span class="landing-status-dot"></span>
+                        <div>
+                            <strong>Diproses</strong>
+                            <p>Tim sedang meninjau laporan Anda.</p>
+                        </div>
+                    </div>
+
+                    <div class="landing-status-item @(trackResult is not null && trackResult.Status == "Selesai" ? "is-active" : "")">
+                        <span class="landing-status-dot"></span>
+                        <div>
+                            <strong>Selesai</strong>
+                            <p>Hasil tindak lanjut laporan tersedia.</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <article class="landing-card mt-4">
+                <h3>Petunjuk Penggunaan</h3>
+                <p>Gunakan Report ID dan PIN yang diberikan setelah pengajuan laporan. Jika laporan tidak terlihat, cek kembali data tersebut.</p>
+                <p>Jika 1x24 jam belum muncul, coba hubungi tim dukungan atau gunakan kembali halaman pelacakan.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+@code {
+    private string reportId = string.Empty;
+    private string pin = string.Empty;
+    private bool isLoading;
+    private string? errorMessage;
+    private TrackReportResponse? trackResult;
+
+    private const string TrackEndpoint = "http://localhost:5191/api/reports/track";
+
+    private async Task HandleTrack()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(pin))
+        {
+            errorMessage = "Report ID dan PIN wajib diisi.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            var request = new TrackReportRequest(reportId, pin);
+            var response = await client.PostAsJsonAsync(TrackEndpoint, request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Laporan tidak ditemukan atau kredensial salah.";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<TrackReportResponse>();
+
+            if (result is null)
+            {
+                errorMessage = "Response server tidak valid.";
+                return;
+            }
+
+            trackResult = result;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request terlalu lama. Coba lagi.";
+        }
+        catch
+        {
+            errorMessage = "Terjadi kesalahan saat melacak laporan.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ResetSearch()
+    {
+        reportId = string.Empty;
+        pin = string.Empty;
+        errorMessage = null;
+        trackResult = null;
+    }
+
+    private sealed record TrackReportRequest(string ReportId, string Pin);
+
+    private sealed record TrackReportResponse(
+        string ReportId,
+        string Status,
+        string Title,
+        string? TrackingMessage,
+        DateTime? UpdatedAt
+    );
+}

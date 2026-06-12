@@ -1,43 +1,180 @@
 @page "/lapor/evidence"
 @layout PublicLayout
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
 
 <section class="py-4">
     <div class="mb-4">
         <h1>Tambah Bukti</h1>
-        <p class="lead">Form placeholder untuk menambahkan bukti teks pada laporan yang sudah dibuat.</p>
+        <p class="lead">Tambahkan bukti baru untuk laporan yang sudah dibuat.</p>
     </div>
 
-    <form class="row g-3">
-        <div class="col-md-6">
-            <label class="form-label" for="reportId">Report ID</label>
-            <input id="reportId" class="form-control" />
-        </div>
+    @if (submitResult is null)
+    {
+        <form class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="reportId">Report ID</label>
+                <input
+                    id="reportId"
+                    class="form-control"
+                    @bind="reportId"
+                    @bind:event="oninput" />
+            </div>
 
-        <div class="col-md-6">
-            <label class="form-label" for="pin">PIN</label>
-            <input id="pin" class="form-control" />
-        </div>
+            <div class="col-md-6">
+                <label class="form-label" for="pin">PIN</label>
+                <input
+                    id="pin"
+                    class="form-control"
+                    @bind="pin"
+                    @bind:event="oninput" />
+            </div>
 
-        <div class="col-md-6">
-            <label class="form-label" for="evidenceType">Evidence Type</label>
-            <input id="evidenceType" class="form-control" />
-            <div class="form-text">0 = Testimoni, 1 = KronologiTambahan, 2 = CatatanPendukung</div>
-        </div>
+            <div class="col-md-6">
+                <label class="form-label" for="evidenceType">Evidence Type</label>
+                <input
+                    id="evidenceType"
+                    type="number"
+                    min="0"
+                    class="form-control"
+                    @bind="evidenceType"
+                    @bind:event="oninput" />
+                <div class="form-text">0 = Testimoni, 1 = KronologiTambahan, 2 = CatatanPendukung</div>
+            </div>
 
-        <div class="col-12">
-            <label class="form-label" for="content">Content</label>
-            <textarea id="content" class="form-control" rows="4"></textarea>
-        </div>
+            <div class="col-12">
+                <label class="form-label" for="content">Content</label>
+                <textarea
+                    id="content"
+                    class="form-control"
+                    rows="4"
+                    @bind="content"
+                    @bind:event="oninput"></textarea>
+            </div>
 
-        <div class="col-12">
-            <label class="form-label" for="description">Description</label>
-            <textarea id="description" class="form-control" rows="3"></textarea>
-        </div>
+            <div class="col-12">
+                <label class="form-label" for="description">Description</label>
+                <textarea
+                    id="description"
+                    class="form-control"
+                    rows="3"
+                    @bind="description"
+                    @bind:event="oninput"></textarea>
+            </div>
 
-        <div class="col-12">
-            <button class="btn btn-primary" type="button">Tambah Bukti</button>
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="col-12 text-danger">@errorMessage</div>
+            }
+
+            <div class="col-12">
+                <button
+                    class="btn btn-primary"
+                    type="button"
+                    disabled="@isLoading"
+                    @onclick="HandleSubmit">
+                    @(isLoading ? "Mengirim..." : "Tambah Bukti")
+                </button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <div class="alert alert-success">
+            <h4 class="alert-heading">Bukti berhasil ditambahkan!</h4>
+            <p>Laporan <strong>@submitResult.ReportId</strong> telah menerima bukti baru.</p>
+            <p>Jenis bukti: <strong>@submitResult.EvidenceType</strong></p>
+            <button class="btn btn-secondary" type="button" @onclick="ResetForm">Tambah bukti lain</button>
         </div>
-    </form>
+    }
 </section>
 
-@* TODO: Integrate POST /api/reports/{id}/evidences *@
+@code {
+    private string reportId = string.Empty;
+    private string pin = string.Empty;
+    private int evidenceType;
+    private string content = string.Empty;
+    private string description = string.Empty;
+    private bool isLoading;
+    private string? errorMessage;
+    private EvidenceSubmissionResult? submitResult;
+
+    private const string EvidenceEndpointTemplate = "http://localhost:5191/api/reports/{0}/evidences";
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(reportId)
+            || string.IsNullOrWhiteSpace(pin)
+            || evidenceType < 0
+            || string.IsNullOrWhiteSpace(content)
+            || string.IsNullOrWhiteSpace(description))
+        {
+            errorMessage = "Semua field wajib diisi dengan benar.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            var endpoint = string.Format(EvidenceEndpointTemplate, reportId);
+            var request = new AddEvidenceRequest(pin, evidenceType, content, description);
+            var response = await client.PostAsJsonAsync(endpoint, request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Gagal menambahkan bukti. Periksa kembali Report ID dan PIN.";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<EvidenceSubmissionResult>();
+
+            if (result is null)
+            {
+                errorMessage = "Response server tidak valid.";
+                return;
+            }
+
+            submitResult = result;
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request terlalu lama. Coba lagi.";
+        }
+        catch
+        {
+            errorMessage = "Terjadi kesalahan saat menambahkan bukti.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        reportId = string.Empty;
+        pin = string.Empty;
+        evidenceType = 0;
+        content = string.Empty;
+        description = string.Empty;
+        errorMessage = null;
+        submitResult = null;
+    }
+
+    private sealed record AddEvidenceRequest(string Pin, int EvidenceType, string Content, string Description);
+
+    private sealed record EvidenceSubmissionResult(
+        string ReportId,
+        int EvidenceType,
+        string Content,
+        string Description
+    );
+}

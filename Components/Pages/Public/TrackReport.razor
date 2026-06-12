@@ -1,27 +1,288 @@
 @page "/lacak"
 @layout PublicLayout
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
 
-<section class="py-4">
-    <div class="mb-4">
+<section class="report-page">
+    <div class="report-heading">
+        <p class="report-badge">Pelacakan Laporan</p>
         <h1>Lacak Laporan</h1>
-        <p class="lead">Masukkan Report ID dan PIN untuk melihat status laporan.</p>
+        <p class="report-lead">
+            Masukkan Report ID dan PIN untuk melihat status terbaru laporan.
+        </p>
     </div>
 
-    <form class="row g-3" style="max-width: 560px;">
-        <div class="col-12">
-            <label class="form-label" for="reportId">Report ID</label>
-            <input id="reportId" class="form-control" />
-        </div>
+    @if (trackResult is null)
+    {
+        <div class="report-card" style="max-width: 560px;">
+            <div class="report-grid">
+                <div class="report-field report-field-full">
+                    <label for="reportId">Report ID</label>
+                    <input
+                        id="reportId"
+                        type="text"
+                        class="form-control"
+                        placeholder="Masukkan Report ID"
+                        @bind="reportId"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-12">
-            <label class="form-label" for="pin">PIN</label>
-            <input id="pin" class="form-control" />
-        </div>
+                <div class="report-field report-field-full">
+                    <label for="pin">PIN</label>
+                    <input
+                        id="pin"
+                        type="text"
+                        class="form-control"
+                        placeholder="Masukkan PIN"
+                        @bind="pin"
+                        @bind:event="oninput" />
+                </div>
 
-        <div class="col-12">
-            <button class="btn btn-primary" type="button">Lacak Status</button>
+                @if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="report-error">
+                        @errorMessage
+                    </div>
+                }
+
+                <button
+                    class="report-submit"
+                    type="button"
+                    disabled="@isLoading"
+                    @onclick="HandleTrack">
+                    @(isLoading ? "Memproses..." : "Lacak Status")
+                </button>
+            </div>
         </div>
-    </form>
+    }
+    else
+    {
+        <div class="report-card report-success" style="max-width: 560px;">
+            <div class="report-success-icon">✓</div>
+            <h1>Status Laporan</h1>
+            <p class="report-lead">Informasi terbaru untuk laporan Anda.</p>
+
+            <div class="report-credentials">
+                <div class="report-credential">
+                    <span>Report ID</span>
+                    <strong>@trackResult.ReportId</strong>
+                </div>
+                <div class="report-credential">
+                    <span>Status</span>
+                    <strong>@trackResult.Status</strong>
+                </div>
+            </div>
+
+            <div class="report-detail">
+                <p><strong>Judul:</strong> @trackResult.Title</p>
+                @if (!string.IsNullOrWhiteSpace(trackResult.TrackingMessage))
+                {
+                    <p><strong>Catatan:</strong> @trackResult.TrackingMessage</p>
+                }
+                @if (trackResult.UpdatedAt is not null)
+                {
+                    <p><strong>Diperbarui:</strong> @trackResult.UpdatedAt.Value.ToString("g")</p>
+                }
+            </div>
+
+            <div class="report-success-actions">
+                <button class="landing-button landing-button-secondary" type="button" @onclick="ResetSearch">
+                    Lacak Laporan Lain
+                </button>
+            </div>
+        </div>
+    }
 </section>
 
-@* TODO: Integrate POST /api/reports/track *@
+@code {
+    private string reportId = string.Empty;
+    private string pin = string.Empty;
+    private bool isLoading;
+    private string? errorMessage;
+    private TrackReportResponse? trackResult;
+
+    private const string TrackEndpoint = "http://localhost:5191/api/reports/track";
+
+    private async Task HandleTrack()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(pin))
+        {
+            errorMessage = "Report ID dan PIN wajib diisi.";
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            var request = new TrackReportRequest(reportId, pin);
+            var response = await client.PostAsJsonAsync(TrackEndpoint, request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed
+                || response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                var queryUrl = $"{TrackEndpoint}?reportId={Uri.EscapeDataString(reportId)}&pin={Uri.EscapeDataString(pin)}";
+                response = await client.GetAsync(queryUrl);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var serverText = await response.Content.ReadAsStringAsync();
+                errorMessage = !string.IsNullOrWhiteSpace(serverText)
+                    ? serverText
+                    : $"Laporan tidak ditemukan atau kredensial salah. ({response.StatusCode})";
+                return;
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            trackResult = ParseTrackReportResponse(content);
+
+            if (trackResult is null)
+            {
+                errorMessage = "Response server tidak valid.";
+                return;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server. Pastikan backend berjalan dan alamat API benar.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request terlalu lama. Coba lagi.";
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            errorMessage = "Response server tidak dapat dibaca.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Terjadi kesalahan saat melacak laporan: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private TrackReportResponse? ParseTrackReportResponse(string content)
+    {
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        if (System.Text.Json.JsonSerializer.Deserialize<TrackReportResponse>(content, options) is TrackReportResponse response)
+        {
+            return response;
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(content);
+        var element = document.RootElement;
+
+        if (element.TryGetProperty("data", out var dataElement))
+        {
+            element = dataElement;
+        }
+
+        string reportIdValue = GetString(element, "reportId", "id", "reportID", "report_id") ?? string.Empty;
+        string statusValue = NormalizeStatus(GetString(element, "status", "statusLabel", "status_name", "statusLabelId") ?? string.Empty);
+        string titleValue = GetString(element, "title", "judul", "subject", "reportTitle") ?? "-";
+        string? trackingMessageValue = GetString(element, "trackingMessage", "message", "catatan", "note");
+        DateTime? updatedAtValue = GetDateTime(element, "updatedAt", "updated", "lastUpdated", "modifiedAt");
+
+        if (string.IsNullOrWhiteSpace(reportIdValue) || string.IsNullOrWhiteSpace(statusValue))
+        {
+            return null;
+        }
+
+        return new TrackReportResponse(reportIdValue, statusValue, titleValue, trackingMessageValue, updatedAtValue);
+    }
+
+    private static string? GetString(System.Text.Json.JsonElement element, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (element.TryGetProperty(name, out var property))
+            {
+                if (property.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    return property.GetString();
+                }
+
+                if (property.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    return property.GetRawText();
+                }
+
+                if (property.ValueKind == System.Text.Json.JsonValueKind.True || property.ValueKind == System.Text.Json.JsonValueKind.False)
+                {
+                    return property.GetBoolean().ToString();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static DateTime? GetDateTime(System.Text.Json.JsonElement element, params string[] names)
+    {
+        var value = GetString(element, names);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateTime.TryParse(value, out var result))
+        {
+            return result;
+        }
+
+        if (long.TryParse(value, out var unixSeconds))
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).DateTime;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeStatus(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return string.Empty;
+
+        status = status.Trim();
+
+        return status.ToLowerInvariant() switch
+        {
+            "0" => "Diterima",
+            "1" => "Diproses",
+            "2" => "Selesai",
+            "diterima" => "Diterima",
+            "diproses" => "Diproses",
+            "selesai" => "Selesai",
+            _ => char.ToUpper(status[0]) + status[1..]
+        };
+    }
+
+    private void ResetSearch()
+    {
+        reportId = string.Empty;
+        pin = string.Empty;
+        errorMessage = null;
+        trackResult = null;
+    }
+
+    private sealed record TrackReportRequest(string ReportId, string Pin);
+
+    private sealed record TrackReportResponse(
+        string ReportId,
+        string Status,
+        string Title,
+        string? TrackingMessage,
+        DateTime? UpdatedAt
+    );
+}
