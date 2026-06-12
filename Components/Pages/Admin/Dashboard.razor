@@ -1,6 +1,87 @@
 @page "/admin/dashboard"
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
 
-<h1>Dashboard Admin</h1>
-<p>Halaman ringkasan laporan untuk admin.</p>
+<section class="admin-dashboard-page">
+    <div class="admin-dashboard-heading">
+        <h1>Dashboard Admin</h1>
+        <p>Menampilkan jumlah laporan berdasarkan status saat ini.</p>
+    </div>
 
-@* TODO: Integrate GET /api/reports/summary. *@
+    @if (isLoading)
+    {
+        <div class="admin-dashboard-card">
+            <p>Memuat data dashboard...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="admin-dashboard-error">
+            @errorMessage
+        </div>
+    }
+    else if (summary != null)
+    {
+        <div class="admin-summary-grid">
+            <div class="admin-summary-card admin-summary-total">
+                <span>Total Laporan</span>
+                <strong>@summary.Total</strong>
+            </div>
+
+            <div class="admin-summary-card admin-summary-diterima">
+                <span>Diterima</span>
+                <strong>@summary.Diterima</strong>
+            </div>
+
+            <div class="admin-summary-card admin-summary-diproses">
+                <span>Diproses</span>
+                <strong>@summary.Diproses</strong>
+            </div>
+
+            <div class="admin-summary-card admin-summary-selesai">
+                <span>Selesai</span>
+                <strong>@summary.Selesai</strong>
+            </div>
+
+            <div class="admin-summary-card admin-summary-ditolak">
+                <span>Ditolak</span>
+                <strong>@summary.Ditolak</strong>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private ReportSummary? summary;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+
+            summary = await httpClient.GetFromJsonAsync<ReportSummary>(
+                "http://localhost:5191/api/reports/summary"
+            );
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Gagal mengambil data dashboard: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class ReportSummary
+    {
+        public int Total { get; set; }
+        public int Diterima { get; set; }
+        public int Diproses { get; set; }
+        public int Selesai { get; set; }
+        public int Ditolak { get; set; }
+    }
+}
