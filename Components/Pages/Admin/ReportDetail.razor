@@ -1,6 +1,245 @@
-@page "/admin/laporan/detail/{id}"
+@page "/admin/laporan/detail/{Id}"
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
-<h1>Detail Laporan</h1>
-<p>Detail laporan, kronologi, bukti, dan status penanganan.</p>
+<section class="admin-detail-page">
+    <div class="admin-detail-heading">
+        <div>
+            <h1>Detail Laporan</h1>
+            <p>Menampilkan informasi lengkap dari laporan yang dipilih.</p>
+        </div>
 
-@* TODO: Integrate GET /api/reports/{id} and status actions. *@
+        <a class="admin-detail-back-button" href="/admin/laporan">
+            Kembali
+        </a>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="admin-detail-card">
+            <p>Memuat detail laporan...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="admin-detail-error">
+            @errorMessage
+        </div>
+    }
+    else if (report is null)
+    {
+        <div class="admin-detail-card">
+            <p>Data laporan tidak ditemukan.</p>
+        </div>
+    }
+    else
+    {
+        <div class="admin-detail-card">
+            <div class="admin-detail-title-row">
+                <div>
+                    <span class="admin-detail-label">Judul Laporan</span>
+                    <h2>@(report.Title ?? "-")</h2>
+                </div>
+
+                <span class="@GetStatusBadgeClass(report.Status)">
+                    @GetStatusText(report.Status)
+                </span>
+            </div>
+
+            <div class="admin-detail-section">
+                <h3>Informasi Laporan</h3>
+
+                <div class="admin-detail-info-grid">
+                    <div class="admin-detail-info-item">
+                        <span>Pelapor</span>
+                        <strong>@(report.ReporterName ?? "-")</strong>
+                    </div>
+
+                    <div class="admin-detail-info-item">
+                        <span>No HP Pelapor</span>
+                        <strong>@(report.ReporterNoHP ?? "-")</strong>
+                    </div>
+
+                    <div class="admin-detail-info-item">
+                        <span>Terlapor</span>
+                        <strong>@(report.ReportedPerson ?? "-")</strong>
+                    </div>
+
+                    <div class="admin-detail-info-item">
+                        <span>Lokasi</span>
+                        <strong>@(report.Location ?? "-")</strong>
+                    </div>
+
+                    <div class="admin-detail-info-item">
+                        <span>Tanggal Kejadian</span>
+                        <strong>@FormatDate(report.IncidentDate)</strong>
+                    </div>
+
+                    <div class="admin-detail-info-item">
+                        <span>Report ID</span>
+                        <strong>@report.ReportId</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-detail-section">
+                <h3>Kronologi</h3>
+
+                <div class="admin-detail-description">
+                    @(string.IsNullOrWhiteSpace(report.Description)
+                        ? "-"
+                        : report.Description)
+                </div>
+            </div>
+
+            <div class="admin-detail-section">
+                <h3>Evidence</h3>
+
+                @if (report.Evidences == null || report.Evidences.Count == 0)
+                {
+                    <div class="admin-detail-empty">
+                        Belum ada evidence yang ditambahkan.
+                    </div>
+                }
+                else
+                {
+                    <div class="admin-detail-table-wrapper">
+                        <table class="admin-detail-table">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Tipe</th>
+                                    <th>Konten</th>
+                                    <th>Deskripsi</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @for (int i = 0; i < report.Evidences.Count; i++)
+                                {
+                                    var evidence = report.Evidences[i];
+
+                                    <tr>
+                                        <td>@(i + 1)</td>
+                                        <td>@GetEvidenceType(evidence.Type)</td>
+                                        <td>@(evidence.Content ?? "-")</td>
+                                        <td>@(evidence.Description ?? "-")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private ReportDetailResponse? report;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            errorMessage = "Report ID tidak ditemukan.";
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var httpClient = HttpClientFactory.CreateClient();
+
+            report = await httpClient.GetFromJsonAsync<ReportDetailResponse>(
+                $"http://localhost:5191/api/reports/{Id}"
+            );
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Gagal mengambil detail laporan: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Diterima",
+            1 => "Diproses",
+            2 => "Selesai",
+            3 => "Ditolak",
+            _ => "Tidak diketahui"
+        };
+    }
+
+    private string GetStatusBadgeClass(int status)
+    {
+        return status switch
+        {
+            0 => "status-badge status-diterima",
+            1 => "status-badge status-diproses",
+            2 => "status-badge status-selesai",
+            3 => "status-badge status-ditolak",
+            _ => "status-badge"
+        };
+    }
+
+    private string GetEvidenceType(int type)
+    {
+        return type switch
+        {
+            0 => "Testimoni",
+            1 => "Kronologi Tambahan",
+            2 => "Catatan Pendukung",
+            _ => "Tidak diketahui"
+        };
+    }
+
+    private string FormatDate(DateTime? date)
+    {
+        return date.HasValue
+            ? date.Value.ToString("dd MMM yyyy")
+            : "-";
+    }
+
+    public class ReportDetailResponse
+    {
+        public Guid ReportId { get; set; }
+        public string? ReporterName { get; set; }
+        public string? ReporterNoHP { get; set; }
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public string? ReportedPerson { get; set; }
+        public string? Location { get; set; }
+        public DateTime? IncidentDate { get; set; }
+        public int Status { get; set; }
+        public List<EvidenceItem> Evidences { get; set; } = new();
+    }
+
+    public class EvidenceItem
+    {
+        public Guid EvidenceId { get; set; }
+        public int Type { get; set; }
+        public string? Content { get; set; }
+        public string? Description { get; set; }
+    }
+}
