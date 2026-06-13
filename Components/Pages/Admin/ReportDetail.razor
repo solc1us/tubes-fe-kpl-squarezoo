@@ -1,83 +1,144 @@
-@page "/admin/laporan/detail/{id}"
+@page "/admin/laporan/detail/{Id}"
 @rendermode InteractiveServer
 @using System.Net.Http.Json
 @inject IHttpClientFactory HttpClientFactory
 
-<h1>Detail Laporan</h1>
+<section class="admin-detail-page">
+    <div class="admin-detail-heading">
+        <div>
+            <h1>Detail Laporan</h1>
+            <p>Menampilkan informasi lengkap dari laporan yang dipilih.</p>
+        </div>
 
-@if (isLoading)
-{
-    <p>Memuat detail laporan...</p>
-}
-else if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">
-        @errorMessage
+        <a class="admin-detail-back-button" href="/admin/laporan">
+            Kembali
+        </a>
     </div>
-}
-else if (report is not null)
-{
-    <div class="card p-4">
 
-        <h3>@report.Title</h3>
+    @if (isLoading)
+    {
+        <div class="admin-detail-card">
+            <p>Memuat detail laporan...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="admin-detail-error">
+            @errorMessage
+        </div>
+    }
+    else if (report is null)
+    {
+        <div class="admin-detail-card">
+            <p>Data laporan tidak ditemukan.</p>
+        </div>
+    }
+    else
+    {
+        <div class="admin-detail-card">
+            <div class="admin-detail-title-row">
+                <div>
+                    <span class="admin-detail-label">Judul Laporan</span>
+                    <h2>@(report.Title ?? "-")</h2>
+                </div>
 
-        <hr />
+                <span class="@GetStatusBadgeClass(report.Status)">
+                    @GetStatusText(report.Status)
+                </span>
+            </div>
 
-        <p><strong>Pelapor:</strong> @report.ReporterName</p>
-        <p><strong>No HP:</strong> @report.ReporterNoHP</p>
-        <p><strong>Terlapor:</strong> @report.ReportedPerson</p>
-        <p><strong>Lokasi:</strong> @report.Location</p>
-        <p><strong>Tanggal Kejadian:</strong> @FormatDate(report.IncidentDate)</p>
-        <p><strong>Status:</strong> @GetStatusText(report.Status)</p>
+            <div class="admin-detail-section">
+                <h3>Informasi Laporan</h3>
 
-        <hr />
+                <div class="admin-detail-info-grid">
+                    <div class="admin-detail-info-item">
+                        <span>Pelapor</span>
+                        <strong>@(report.ReporterName ?? "-")</strong>
+                    </div>
 
-        <h4>Kronologi</h4>
+                    <div class="admin-detail-info-item">
+                        <span>No HP Pelapor</span>
+                        <strong>@(report.ReporterNoHP ?? "-")</strong>
+                    </div>
 
-        <p>
-            @(string.IsNullOrWhiteSpace(report.Description)
-                ? "-"
-                : report.Description)
-        </p>
+                    <div class="admin-detail-info-item">
+                        <span>Terlapor</span>
+                        <strong>@(report.ReportedPerson ?? "-")</strong>
+                    </div>
 
-        <hr />
+                    <div class="admin-detail-info-item">
+                        <span>Lokasi</span>
+                        <strong>@(report.Location ?? "-")</strong>
+                    </div>
 
-        <h4>Bukti / Evidence</h4>
+                    <div class="admin-detail-info-item">
+                        <span>Tanggal Kejadian</span>
+                        <strong>@FormatDate(report.IncidentDate)</strong>
+                    </div>
 
-        @if (report.Evidences == null || report.Evidences.Count == 0)
-        {
-            <p>Tidak ada evidence.</p>
-        }
-        else
-        {
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Tipe</th>
-                        <th>Konten</th>
-                        <th>Deskripsi</th>
-                    </tr>
-                </thead>
+                    <div class="admin-detail-info-item">
+                        <span>Report ID</span>
+                        <strong>@report.ReportId</strong>
+                    </div>
+                </div>
+            </div>
 
-                <tbody>
-                    @foreach (var evidence in report.Evidences)
-                    {
-                        <tr>
-                            <td>@GetEvidenceType(evidence.Type)</td>
-                            <td>@evidence.Content</td>
-                            <td>@evidence.Description</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-    </div>
-}
+            <div class="admin-detail-section">
+                <h3>Kronologi</h3>
+
+                <div class="admin-detail-description">
+                    @(string.IsNullOrWhiteSpace(report.Description)
+                        ? "-"
+                        : report.Description)
+                </div>
+            </div>
+
+            <div class="admin-detail-section">
+                <h3>Evidence</h3>
+
+                @if (report.Evidences == null || report.Evidences.Count == 0)
+                {
+                    <div class="admin-detail-empty">
+                        Belum ada evidence yang ditambahkan.
+                    </div>
+                }
+                else
+                {
+                    <div class="admin-detail-table-wrapper">
+                        <table class="admin-detail-table">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Tipe</th>
+                                    <th>Konten</th>
+                                    <th>Deskripsi</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @for (int i = 0; i < report.Evidences.Count; i++)
+                                {
+                                    var evidence = report.Evidences[i];
+
+                                    <tr>
+                                        <td>@(i + 1)</td>
+                                        <td>@GetEvidenceType(evidence.Type)</td>
+                                        <td>@(evidence.Content ?? "-")</td>
+                                        <td>@(evidence.Description ?? "-")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</section>
 
 @code {
-
     [Parameter]
-    public string? id { get; set; }
+    public string? Id { get; set; }
 
     private ReportDetailResponse? report;
     private bool isLoading = true;
@@ -90,7 +151,7 @@ else if (report is not null)
 
     private async Task LoadReport()
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (string.IsNullOrWhiteSpace(Id))
         {
             errorMessage = "Report ID tidak ditemukan.";
             isLoading = false;
@@ -105,7 +166,7 @@ else if (report is not null)
             var httpClient = HttpClientFactory.CreateClient();
 
             report = await httpClient.GetFromJsonAsync<ReportDetailResponse>(
-                $"http://localhost:5191/api/reports/{id}"
+                $"http://localhost:5191/api/reports/{Id}"
             );
         }
         catch (Exception ex)
@@ -130,13 +191,26 @@ else if (report is not null)
         };
     }
 
+    private string GetStatusBadgeClass(int status)
+    {
+        return status switch
+        {
+            0 => "status-badge status-diterima",
+            1 => "status-badge status-diproses",
+            2 => "status-badge status-selesai",
+            3 => "status-badge status-ditolak",
+            _ => "status-badge"
+        };
+    }
+
     private string GetEvidenceType(int type)
     {
         return type switch
         {
             0 => "Testimoni",
-            1 => "Keterangan Korban",
-            _ => "Lainnya"
+            1 => "Kronologi Tambahan",
+            2 => "Catatan Pendukung",
+            _ => "Tidak diketahui"
         };
     }
 
@@ -158,7 +232,6 @@ else if (report is not null)
         public string? Location { get; set; }
         public DateTime? IncidentDate { get; set; }
         public int Status { get; set; }
-
         public List<EvidenceItem> Evidences { get; set; } = new();
     }
 
