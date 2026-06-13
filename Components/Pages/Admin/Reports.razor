@@ -6,7 +6,7 @@
 <section class="admin-reports-page">
     <div class="admin-reports-heading">
         <h1>Laporan Masuk</h1>
-        <p>Menampilkan daftar laporan yang masuk ke sistem.</p>
+        <p>Menampilkan laporan yang masih perlu ditinjau oleh admin.</p>
     </div>
 
     @if (isLoading)
@@ -24,7 +24,7 @@
     else if (reports == null || reports.Count == 0)
     {
         <div class="admin-reports-card">
-            <p>Belum ada laporan yang tersedia.</p>
+            <p>Belum ada laporan dengan status diterima atau diproses.</p>
         </div>
     }
     else
@@ -40,6 +40,7 @@
                         <th>Lokasi</th>
                         <th>Tanggal Kejadian</th>
                         <th>Status</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
 
@@ -62,6 +63,11 @@
                                 <span class="@GetStatusBadgeClass(report.Status)">
                                     @GetStatusText(report.Status)
                                 </span>
+                            </td>
+                            <td>
+                                <a class="admin-detail-button" href="/admin/laporan/detail/@report.GetReportId()">
+                                    Detail
+                                </a>
                             </td>
                         </tr>
                     }
@@ -90,9 +96,13 @@
         {
             var httpClient = HttpClientFactory.CreateClient();
 
-            reports = await httpClient.GetFromJsonAsync<List<ReportItem>>(
+            var allReports = await httpClient.GetFromJsonAsync<List<ReportItem>>(
                 "http://localhost:5191/api/reports"
             ) ?? new List<ReportItem>();
+
+            reports = allReports
+                .Where(report => report.Status == 0 || report.Status == 1)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -110,8 +120,6 @@
         {
             0 => "Diterima",
             1 => "Diproses",
-            2 => "Selesai",
-            3 => "Ditolak",
             _ => "Tidak diketahui"
         };
     }
@@ -122,8 +130,6 @@
         {
             0 => "status-badge status-diterima",
             1 => "status-badge status-diproses",
-            2 => "status-badge status-selesai",
-            3 => "status-badge status-ditolak",
             _ => "status-badge"
         };
     }
@@ -137,6 +143,8 @@
 
     public class ReportItem
     {
+        public string? Id { get; set; }
+        public string? ReportId { get; set; }
         public string? Title { get; set; }
         public string? ReporterName { get; set; }
         public string? ReporterNoHP { get; set; }
@@ -144,5 +152,10 @@
         public string? Location { get; set; }
         public DateTime? IncidentDate { get; set; }
         public int Status { get; set; }
+
+        public string GetReportId()
+        {
+            return !string.IsNullOrEmpty(ReportId) ? ReportId : Id ?? "";
+        }
     }
 }
