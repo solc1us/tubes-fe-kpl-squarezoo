@@ -1101,73 +1101,7 @@ h1:focus {
     }
 }
 
-.admin-reports-page {
-    padding: 24px 32px;
-}
 
-.admin-reports-heading h1 {
-    color: #0f172a;
-    font-size: 3rem;
-    font-weight: 800;
-    margin-bottom: 8px;
-}
-
-.admin-reports-heading p {
-    color: #64748b;
-    font-size: 1rem;
-    margin-bottom: 28px;
-}
-
-.admin-reports-card,
-.admin-reports-table-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 24px;
-    overflow: hidden;
-}
-
-.admin-reports-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.admin-reports-table th {
-    background: #f8fafc;
-    color: #475569;
-    font-weight: 700;
-    padding: 20px;
-    text-align: left;
-}
-
-.admin-reports-table td {
-    padding: 20px;
-    border-top: 1px solid #e5e7eb;
-}
-
-.status-badge {
-    display: inline-block;
-    padding: 8px 16px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 0.9rem;
-}
-
-.status-selesai {
-    background: #dcfce7;
-    color: #15803d;
-}
-
-.status-ditolak {
-    background: #fee2e2;
-    color: #dc2626;
-}
-
-.admin-reports-error {
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
-    border-radius: 16px;
-    padding: 16px;
 .admin-detail-button {
     display: inline-flex;
     align-items: center;
