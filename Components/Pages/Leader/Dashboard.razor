@@ -1,6 +1,120 @@
 @page "/pimpinan/dashboard"
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
-<h1>Dashboard Pimpinan</h1>
-<p>Halaman ringkasan laporan untuk Pimpinan.</p>
+<section class="dashboard-page">
+    <div class="dashboard-heading">
+        <p class="dashboard-badge">Ringkasan pimpinan</p>
+        <h1>Dashboard Pimpinan</h1>
+        <p>Memantau jumlah laporan berdasarkan status penanganan saat ini.</p>
+    </div>
 
-@* TODO: Integrate GET /api/reports/summary. *@
+    @if (isLoading)
+    {
+        <div class="dashboard-card">
+            <p>Memuat ringkasan laporan...</p>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="dashboard-error">
+            @errorMessage
+        </div>
+    }
+    else if (summary is not null)
+    {
+        <div class="summary-grid">
+            <article class="summary-card summary-card-total">
+                <span>Total Laporan</span>
+                <strong>@summary.Total</strong>
+            </article>
+
+            <article class="summary-card summary-card-diterima">
+                <span>Diterima</span>
+                <strong>@summary.Diterima</strong>
+            </article>
+
+            <article class="summary-card summary-card-diproses">
+                <span>Diproses</span>
+                <strong>@summary.Diproses</strong>
+            </article>
+
+            <article class="summary-card summary-card-selesai">
+                <span>Selesai</span>
+                <strong>@summary.Selesai</strong>
+            </article>
+
+            <article class="summary-card summary-card-ditolak">
+                <span>Ditolak</span>
+                <strong>@summary.Ditolak</strong>
+            </article>
+        </div>
+
+        <div class="dashboard-card dashboard-progress-card">
+            <div>
+                <span>Persentase selesai</span>
+                <strong>@GetPercentage(summary.Selesai)%</strong>
+            </div>
+            <div class="dashboard-progress-track" aria-label="Persentase laporan selesai">
+                <span style="width: @GetPercentage(summary.Selesai)%"></span>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private const string SummaryEndpoint = "http://localhost:5191/api/reports/summary";
+
+    private ReportSummaryResponse? summary;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            summary = await client.GetFromJsonAsync<ReportSummaryResponse>(SummaryEndpoint);
+
+            if (summary is null)
+            {
+                errorMessage = "Response ringkasan laporan tidak valid.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server ringkasan laporan.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request ringkasan laporan terlalu lama.";
+        }
+        catch
+        {
+            errorMessage = "Terjadi kesalahan saat memuat ringkasan laporan.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private int GetPercentage(int value)
+    {
+        if (summary is null || summary.Total <= 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Round(value * 100.0 / summary.Total);
+    }
+
+    private sealed record ReportSummaryResponse(
+        int Total,
+        int Diterima,
+        int Diproses,
+        int Selesai,
+        int Ditolak
+    );
+}
