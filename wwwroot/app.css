@@ -447,8 +447,44 @@ h1:focus {
 	margin-top: auto;
 }
 
+.nav-section {
+	display: grid;
+	gap: 0.15rem;
+}
+
+.nav-section + .nav-section {
+	margin-top: 0.85rem;
+}
+
+.nav-section-title {
+	padding: 0.75rem 1.5rem 0.25rem;
+	color: rgba(255, 255, 255, 0.62);
+	font-size: 0.72rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.logout-button {
+	width: 100%;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+}
+
 .sidebar-nav {
 	min-height: calc(100vh - 4.5rem);
+}
+
+.auth-checking {
+	padding: 1.25rem;
+	color: #64748b;
+}
+
+.auth-checking p {
+	margin: 0;
 }
 
 .report-page {

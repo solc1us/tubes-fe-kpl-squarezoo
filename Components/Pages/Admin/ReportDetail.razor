@@ -3,6 +3,7 @@
 @using System.Net.Http.Json
 @inject IHttpClientFactory HttpClientFactory
 
+<RequireLogin RequiredRole="1">
 <section class="admin-detail-page">
     <div class="admin-detail-heading">
         <div>
@@ -135,6 +136,7 @@
         </div>
     }
 </section>
+</RequireLogin>
 
 @code {
     [Parameter]

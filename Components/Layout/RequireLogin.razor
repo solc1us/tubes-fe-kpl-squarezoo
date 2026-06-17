@@ -1,0 +1,100 @@
+@using System.Text.Json
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@if (isAuthorized)
+{
+    @ChildContent
+}
+else
+{
+    <div class="auth-checking">
+        <p>Memeriksa sesi...</p>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public int? RequiredRole { get; set; }
+
+    private bool isAuthorized;
+    private const string UserStorageKey = "laporU_user";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var storedUser = await JS.InvokeAsync<string?>("localStorage.getItem", UserStorageKey);
+
+        if (string.IsNullOrWhiteSpace(storedUser))
+        {
+            Navigation.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        StoredUser? user;
+
+        try
+        {
+            user = JsonSerializer.Deserialize<StoredUser>(storedUser, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (JsonException)
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", UserStorageKey);
+            Navigation.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        if (user is null)
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", UserStorageKey);
+            Navigation.NavigateTo("/login", replace: true);
+            return;
+        }
+
+        var currentPath = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+        var expectedRole = RequiredRole;
+
+        if (expectedRole is null && currentPath.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
+        {
+            expectedRole = 1;
+        }
+
+        if (expectedRole is null && string.Equals(currentPath, "/pimpinan/dashboard", StringComparison.OrdinalIgnoreCase))
+        {
+            expectedRole = 2;
+        }
+
+        if (expectedRole == 1 && user.Role != 1)
+        {
+            Navigation.NavigateTo(user.Role == 2 ? "/pimpinan/dashboard" : "/login", replace: true);
+            return;
+        }
+
+        if (expectedRole == 2 && user.Role != 2)
+        {
+            Navigation.NavigateTo(user.Role == 1 ? "/admin/dashboard" : "/login", replace: true);
+            return;
+        }
+
+        isAuthorized = true;
+        StateHasChanged();
+    }
+
+    private sealed record StoredUser(
+        Guid UserId,
+        string Name,
+        string NoHP,
+        int Role,
+        List<string> Permissions
+    );
+}

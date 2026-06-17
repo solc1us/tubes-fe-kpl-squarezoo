@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
 @inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JS
 
 <main class="login-page">
     <section class="login-card">
@@ -93,12 +94,14 @@
 
             if (loginResult.Role == 1)
             {
+                await StoreLoginResult(loginResult);
                 Navigation.NavigateTo("/admin/dashboard");
                 return;
             }
 
             if (loginResult.Role == 2)
             {
+                await StoreLoginResult(loginResult);
                 Navigation.NavigateTo("/pimpinan/dashboard");
                 return;
             }
@@ -121,6 +124,16 @@
         {
             isLoading = false;
         }
+    }
+
+    private async Task StoreLoginResult(LoginResponse loginResult)
+    {
+        var storedUser = System.Text.Json.JsonSerializer.Serialize(loginResult, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
+
+        await JS.InvokeVoidAsync("localStorage.setItem", "laporU_user", storedUser);
     }
 
     private sealed record LoginRequest(string NoHP, string Password);
