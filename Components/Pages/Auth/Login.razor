@@ -1,54 +1,66 @@
 @page "/login"
 @layout EmptyLayout
 @rendermode InteractiveServer
+@using System.Text.Json
 @inject NavigationManager Navigation
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
 
 <main class="login-page">
-    <section class="login-card">
-        <a class="login-back" href="/">← Kembali</a>
-
-        <div class="login-heading">
-            <h1>Login</h1>
-            <p>Masuk sebagai Admin atau Pimpinan untuk mengelola laporan.</p>
-        </div>
-
-        <div class="login-field">
-            <label for="noHP">No HP</label>
-            <input
-                id="noHP"
-                type="text"
-                placeholder="Masukkan nomor HP"
-                @bind="noHP"
-                @bind:event="oninput" />
-        </div>
-
-        <div class="login-field">
-            <label for="password">Password</label>
-            <input
-                id="password"
-                type="password"
-                placeholder="Masukkan password"
-                @bind="password"
-                @bind:event="oninput" />
-        </div>
-
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <div class="form-alert form-alert-error login-alert">
-                @errorMessage
+    @if (isCheckingSession)
+    {
+        <section class="login-card">
+            <div class="login-heading">
+                <p>Memeriksa sesi...</p>
             </div>
-        }
+        </section>
+    }
+    else
+    {
+        <section class="login-card">
+            <a class="login-back" href="/">&larr; Kembali</a>
 
-        <button
-            class="login-button"
-            type="button"
-            disabled="@isLoading"
-            @onclick="HandleLogin">
-            @(isLoading ? "Memproses..." : "Login")
-        </button>
-    </section>
+            <div class="login-heading">
+                <h1>Login</h1>
+                <p>Masuk sebagai Admin atau Pimpinan untuk mengelola laporan.</p>
+            </div>
+
+            <div class="login-field">
+                <label for="noHP">No HP</label>
+                <input
+                    id="noHP"
+                    type="text"
+                    placeholder="Masukkan nomor HP"
+                    @bind="noHP"
+                    @bind:event="oninput" />
+            </div>
+
+            <div class="login-field">
+                <label for="password">Password</label>
+                <input
+                    id="password"
+                    type="password"
+                    placeholder="Masukkan password"
+                    @bind="password"
+                    @bind:event="oninput" />
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="form-alert form-alert-error login-alert">
+                    @errorMessage
+                </div>
+            }
+
+            <button
+                class="login-button"
+                type="button"
+                disabled="@isLoading"
+                @onclick="HandleLogin">
+                @(isLoading ? "Memproses..." : "Login")
+            </button>
+        </section>
+    }
 </main>
 
 @code {
@@ -56,8 +68,55 @@
     private string password = string.Empty;
     private string? errorMessage;
     private bool isLoading;
+    private bool isCheckingSession = true;
 
     private const string LoginEndpoint = "http://localhost:5191/api/users/login";
+    private const string UserStorageKey = "laporU_user";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var storedUser = await JS.InvokeAsync<string?>("localStorage.getItem", UserStorageKey);
+
+        if (string.IsNullOrWhiteSpace(storedUser))
+        {
+            ShowLoginForm();
+            return;
+        }
+
+        StoredLoginResponse? existingUser;
+
+        try
+        {
+            existingUser = JsonSerializer.Deserialize<StoredLoginResponse>(storedUser, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (JsonException)
+        {
+            await ClearStoredUserAndShowLogin();
+            return;
+        }
+
+        if (existingUser?.Role == 1)
+        {
+            Navigation.NavigateTo("/admin/dashboard", replace: true);
+            return;
+        }
+
+        if (existingUser?.Role == 2)
+        {
+            Navigation.NavigateTo("/pimpinan/dashboard", replace: true);
+            return;
+        }
+
+        await ClearStoredUserAndShowLogin();
+    }
 
     private async Task HandleLogin()
     {
@@ -128,15 +187,29 @@
 
     private async Task StoreLoginResult(LoginResponse loginResult)
     {
-        var storedUser = System.Text.Json.JsonSerializer.Serialize(loginResult, new System.Text.Json.JsonSerializerOptions
+        var storedUser = JsonSerializer.Serialize(loginResult, new JsonSerializerOptions
         {
-            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
 
-        await JS.InvokeVoidAsync("localStorage.setItem", "laporU_user", storedUser);
+        await JS.InvokeVoidAsync("localStorage.setItem", UserStorageKey, storedUser);
+    }
+
+    private async Task ClearStoredUserAndShowLogin()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", UserStorageKey);
+        ShowLoginForm();
+    }
+
+    private void ShowLoginForm()
+    {
+        isCheckingSession = false;
+        StateHasChanged();
     }
 
     private sealed record LoginRequest(string NoHP, string Password);
+
+    private sealed record StoredLoginResponse(int Role);
 
     private sealed record LoginResponse(
         Guid UserId,
