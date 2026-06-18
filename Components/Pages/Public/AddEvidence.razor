@@ -3,88 +3,87 @@
 @rendermode InteractiveServer
 @inject IHttpClientFactory HttpClientFactory
 
-<section class="py-4">
-    <div class="mb-4">
-        <h1>Tambah Bukti</h1>
-        <p class="lead">Tambahkan bukti baru untuk laporan yang sudah dibuat.</p>
+<section class="evidence-page">
+    <div class="evidence-heading">
+        <p class="evidence-badge">Bukti Pendukung</p>
+        <h1>Tambah Bukti Pendukung</h1>
+        <p class="evidence-lead">Masukkan Report ID dan PIN laporan terlebih dahulu sebelum menambahkan bukti baru. Data ini digunakan untuk memastikan bukti masuk ke laporan yang benar.</p>
     </div>
 
     @if (submitResult is null)
     {
-        <form class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label" for="reportId">Report ID</label>
-                <input
-                    id="reportId"
-                    class="form-control"
-                    @bind="reportId"
-                    @bind:event="oninput" />
-            </div>
+        <form class="evidence-card evidence-form">
+            <div class="evidence-grid">
+                <div class="evidence-field">
+                    <label for="reportId">Report ID</label>
+                    <input
+                        id="reportId"
+                        @bind="reportId"
+                        @bind:event="oninput" />
+                </div>
 
-            <div class="col-md-6">
-                <label class="form-label" for="pin">PIN</label>
-                <input
-                    id="pin"
-                    class="form-control"
-                    @bind="pin"
-                    @bind:event="oninput" />
-            </div>
+                <div class="evidence-field">
+                    <label for="pin">PIN</label>
+                    <input
+                        id="pin"
+                        @bind="pin"
+                        @bind:event="oninput" />
+                </div>
 
-            <div class="col-md-6">
-                <label class="form-label" for="evidenceType">Evidence Type</label>
-                <input
-                    id="evidenceType"
-                    type="number"
-                    min="0"
-                    class="form-control"
-                    @bind="evidenceType"
-                    @bind:event="oninput" />
-                <div class="form-text">0 = Testimoni, 1 = KronologiTambahan, 2 = CatatanPendukung</div>
-            </div>
+                <div class="evidence-field evidence-field-full">
+                    <label for="evidenceType">Evidence Type</label>
+                    <select
+                        id="evidenceType"
+                        @bind="evidenceType">
+                        <option value="0">0 - Testimoni</option>
+                        <option value="1">1 - KronologiTambahan</option>
+                        <option value="2">2 - CatatanPendukung</option>
+                    </select>
+                    <p class="evidence-helper">Pilih Testimoni untuk pernyataan saksi, KronologiTambahan untuk detail kejadian lanjutan, atau CatatanPendukung untuk catatan lain yang relevan.</p>
+                </div>
 
-            <div class="col-12">
-                <label class="form-label" for="content">Content</label>
-                <textarea
-                    id="content"
-                    class="form-control"
-                    rows="4"
-                    @bind="content"
-                    @bind:event="oninput"></textarea>
-            </div>
+                <div class="evidence-field evidence-field-full">
+                    <label for="content">Content</label>
+                    <textarea
+                        id="content"
+                        rows="4"
+                        @bind="content"
+                        @bind:event="oninput"></textarea>
+                </div>
 
-            <div class="col-12">
-                <label class="form-label" for="description">Description</label>
-                <textarea
-                    id="description"
-                    class="form-control"
-                    rows="3"
-                    @bind="description"
-                    @bind:event="oninput"></textarea>
+                <div class="evidence-field evidence-field-full">
+                    <label for="description">Description</label>
+                    <textarea
+                        id="description"
+                        rows="3"
+                        @bind="description"
+                        @bind:event="oninput"></textarea>
+                </div>
             </div>
 
             @if (!string.IsNullOrWhiteSpace(errorMessage))
             {
-                <div class="col-12 text-danger">@errorMessage</div>
+                <div class="form-alert form-alert-error">@errorMessage</div>
             }
 
-            <div class="col-12">
-                <button
-                    class="btn btn-primary"
-                    type="button"
-                    disabled="@isLoading"
-                    @onclick="HandleSubmit">
-                    @(isLoading ? "Mengirim..." : "Tambah Bukti")
-                </button>
-            </div>
+            <button
+                class="evidence-submit"
+                type="button"
+                disabled="@isLoading"
+                @onclick="HandleSubmit">
+                @(isLoading ? "Mengirim..." : "Tambah Bukti")
+            </button>
         </form>
     }
     else
     {
-        <div class="alert alert-success">
-            <h4 class="alert-heading">Bukti berhasil ditambahkan!</h4>
-            <p>Laporan <strong>@submitResult.ReportId</strong> telah menerima bukti baru.</p>
-            <p>Jenis bukti: <strong>@submitResult.EvidenceType</strong></p>
-            <button class="btn btn-secondary" type="button" @onclick="ResetForm">Tambah bukti lain</button>
+        <div class="evidence-card evidence-success">
+            <div class="form-alert form-alert-success">
+                <strong>Bukti berhasil ditambahkan.</strong>
+                <span>Laporan @submitResult.ReportId telah menerima bukti baru dengan jenis @submitResult.EvidenceType.</span>
+            </div>
+
+            <button class="evidence-submit" type="button" @onclick="ResetForm">Tambah bukti lain</button>
         </div>
     }
 </section>
@@ -108,6 +107,7 @@
         if (string.IsNullOrWhiteSpace(reportId)
             || string.IsNullOrWhiteSpace(pin)
             || evidenceType < 0
+            || evidenceType > 2
             || string.IsNullOrWhiteSpace(content)
             || string.IsNullOrWhiteSpace(description))
         {
@@ -126,7 +126,7 @@
 
             if (!response.IsSuccessStatusCode)
             {
-                errorMessage = "Gagal menambahkan bukti. Periksa kembali Report ID dan PIN.";
+                errorMessage = "Report ID atau PIN tidak valid. Periksa kembali kredensial laporan Anda.";
                 return;
             }
 
