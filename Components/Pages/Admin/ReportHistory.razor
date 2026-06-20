@@ -1,6 +1,154 @@
 @page "/admin/laporan/history"
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
-<h1>History Laporan</h1>
-<p>Riwayat laporan yang sudah selesai atau ditolak.</p>
+<RequireLogin RequiredRole="1">
+<section class="admin-reports-page">
 
-@* TODO: Integrate GET /api/reports?status=2 and GET /api/reports?status=3. *@
+    <div class="admin-reports-heading">
+        <h1>History Laporan</h1>
+        <p>Menampilkan riwayat laporan yang telah selesai atau ditolak.</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="admin-reports-card">
+            <p>Memuat data laporan...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="admin-reports-error">
+            @errorMessage
+        </div>
+    }
+    else if (reports.Count == 0)
+    {
+        <div class="admin-reports-card">
+            <p>Belum ada history laporan.</p>
+        </div>
+    }
+    else
+    {
+        <div class="admin-reports-table-card">
+            <table class="admin-reports-table">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Judul</th>
+                        <th>Pelapor</th>
+                        <th>Terlapor</th>
+                        <th>Lokasi</th>
+                        <th>Tanggal</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (int i = 0; i < reports.Count; i++)
+                    {
+                        var report = reports[i];
+
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td>@report.Title</td>
+                            <td>@report.ReporterName</td>
+                            <td>@report.ReportedPerson</td>
+                            <td>@report.Location</td>
+                            <td>@FormatDate(report.IncidentDate)</td>
+                            <td>
+                                <span class="@GetStatusBadgeClass(report.Status)">
+                                    @GetStatusText(report.Status)
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+</section>
+</RequireLogin>
+
+@code {
+
+    private List<ReportItem> reports = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReports();
+    }
+
+    private async Task LoadReports()
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+
+            var selesai =
+                await httpClient.GetFromJsonAsync<List<ReportItem>>(
+                    "http://localhost:5191/api/reports?status=2"
+                ) ?? new List<ReportItem>();
+
+            var ditolak =
+                await httpClient.GetFromJsonAsync<List<ReportItem>>(
+                    "http://localhost:5191/api/reports?status=3"
+                ) ?? new List<ReportItem>();
+
+            reports = selesai.Concat(ditolak).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Diterima",
+            1 => "Diproses",
+            2 => "Selesai",
+            3 => "Ditolak",
+            _ => "Tidak diketahui"
+        };
+    }
+
+    private string GetStatusBadgeClass(int status)
+    {
+        return status switch
+        {
+            2 => "status-badge status-selesai",
+            3 => "status-badge status-ditolak",
+            _ => "status-badge"
+        };
+    }
+
+    private string FormatDate(DateTime? date)
+    {
+        return date.HasValue
+            ? date.Value.ToString("dd MMM yyyy")
+            : "-";
+    }
+
+    public class ReportItem
+    {
+        public Guid ReportId { get; set; }
+        public string? Title { get; set; }
+        public string? ReporterName { get; set; }
+        public string? ReporterNoHP { get; set; }
+        public string? ReportedPerson { get; set; }
+        public string? Location { get; set; }
+        public DateTime? IncidentDate { get; set; }
+        public int Status { get; set; }
+    }
+}

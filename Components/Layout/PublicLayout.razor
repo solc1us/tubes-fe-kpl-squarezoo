@@ -1,15 +1,16 @@
 @inherits Microsoft.AspNetCore.Components.LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
 
 <div class="public-layout">
-    <header class="border-bottom bg-white">
-        <nav class="container d-flex flex-wrap align-items-center justify-content-between gap-3 py-3">
-            <a class="navbar-brand fw-semibold text-decoration-none" href="/">Lapor-U</a>
+    <header class="public-navbar">
+        <nav class="container public-navbar-inner">
+            <a class="public-navbar-brand" href="/">Lapor-U</a>
 
-            <div class="d-flex flex-wrap align-items-center gap-3">
-                <a class="text-decoration-none" href="/lapor">Ajukan Laporan</a>
-                <a class="text-decoration-none" href="/lacak">Lacak Laporan</a>
-                <a class="text-decoration-none" href="/lapor/evidence">Tambah Bukti</a>
-                <a class="text-decoration-none" href="/login">Login</a>
+            <div class="public-navbar-links">
+                <NavLink class="public-navbar-link" href="/lapor" Match="NavLinkMatch.All">Ajukan Laporan</NavLink>
+                <NavLink class="public-navbar-link" href="/lacak" Match="NavLinkMatch.All">Lacak Laporan</NavLink>
+                <NavLink class="public-navbar-link" href="/lapor/evidence" Match="NavLinkMatch.All">Tambah Bukti</NavLink>
+                <NavLink class="public-navbar-link public-navbar-login" href="/login" Match="NavLinkMatch.All">Login</NavLink>
             </div>
         </nav>
     </header>

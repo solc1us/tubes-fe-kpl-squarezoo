@@ -1,6 +1,163 @@
 @page "/admin/laporan"
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
-<h1>Laporan Masuk</h1>
-<p>Daftar laporan masuk yang perlu ditinjau admin.</p>
+<RequireLogin RequiredRole="1">
+<section class="admin-reports-page">
+    <div class="admin-reports-heading">
+        <h1>Laporan Masuk</h1>
+        <p>Menampilkan laporan yang masih perlu ditinjau oleh admin.</p>
+    </div>
 
-@* TODO: Integrate GET /api/reports. *@
+    @if (isLoading)
+    {
+        <div class="admin-reports-card">
+            <p>Memuat data laporan...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="admin-reports-error">
+            @errorMessage
+        </div>
+    }
+    else if (reports == null || reports.Count == 0)
+    {
+        <div class="admin-reports-card">
+            <p>Belum ada laporan dengan status diterima atau diproses.</p>
+        </div>
+    }
+    else
+    {
+        <div class="admin-reports-table-card">
+            <table class="admin-reports-table">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Judul</th>
+                        <th>Pelapor</th>
+                        <th>Terlapor</th>
+                        <th>Lokasi</th>
+                        <th>Tanggal Kejadian</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (int i = 0; i < reports.Count; i++)
+                    {
+                        var report = reports[i];
+
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td>@(report.Title ?? "-")</td>
+                            <td>
+                                <div class="reporter-name">@(report.ReporterName ?? "-")</div>
+                                <div class="reporter-phone">@(report.ReporterNoHP ?? "-")</div>
+                            </td>
+                            <td>@(report.ReportedPerson ?? "-")</td>
+                            <td>@(report.Location ?? "-")</td>
+                            <td>@FormatDate(report.IncidentDate)</td>
+                            <td>
+                                <span class="@GetStatusBadgeClass(report.Status)">
+                                    @GetStatusText(report.Status)
+                                </span>
+                            </td>
+                            <td>
+                                <a class="admin-detail-button" href="/admin/laporan/detail/@report.GetReportId()">
+                                    Detail
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+</RequireLogin>
+
+@code {
+    private List<ReportItem> reports = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReports();
+    }
+
+    private async Task LoadReports()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+
+            var allReports = await httpClient.GetFromJsonAsync<List<ReportItem>>(
+                "http://localhost:5191/api/reports"
+            ) ?? new List<ReportItem>();
+
+            reports = allReports
+                .Where(report => report.Status == 0 || report.Status == 1)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Gagal mengambil data laporan: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusText(int status)
+    {
+        return status switch
+        {
+            0 => "Diterima",
+            1 => "Diproses",
+            _ => "Tidak diketahui"
+        };
+    }
+
+    private string GetStatusBadgeClass(int status)
+    {
+        return status switch
+        {
+            0 => "status-badge status-diterima",
+            1 => "status-badge status-diproses",
+            _ => "status-badge"
+        };
+    }
+
+    private string FormatDate(DateTime? date)
+    {
+        return date.HasValue
+            ? date.Value.ToString("dd MMM yyyy")
+            : "-";
+    }
+
+    public class ReportItem
+    {
+        public string? Id { get; set; }
+        public string? ReportId { get; set; }
+        public string? Title { get; set; }
+        public string? ReporterName { get; set; }
+        public string? ReporterNoHP { get; set; }
+        public string? ReportedPerson { get; set; }
+        public string? Location { get; set; }
+        public DateTime? IncidentDate { get; set; }
+        public int Status { get; set; }
+
+        public string GetReportId()
+        {
+            return !string.IsNullOrEmpty(ReportId) ? ReportId : Id ?? "";
+        }
+    }
+}
