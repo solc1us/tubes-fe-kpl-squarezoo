@@ -165,9 +165,9 @@
 
             SetPagedReports();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            errorMessage = $"Gagal mengambil data laporan: {ex.Message}";
+            errorMessage = "Gagal mengambil data laporan. Silakan coba lagi.";
         }
         finally
         {

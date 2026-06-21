@@ -201,9 +201,9 @@
                 $"http://localhost:5191/api/reports/{Id}"
             );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            errorMessage = $"Gagal mengambil detail laporan: {ex.Message}";
+            errorMessage = "Gagal mengambil detail laporan. Silakan coba lagi.";
         }
         finally
         {
@@ -268,9 +268,9 @@
 
             successMessage = "Status laporan berhasil diperbarui.";
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            transitionErrorMessage = $"Gagal melanjutkan proses laporan: {ex.Message}";
+            transitionErrorMessage = "Gagal melanjutkan proses laporan. Silakan coba lagi.";
         }
         finally
         {

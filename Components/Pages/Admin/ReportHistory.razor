@@ -136,9 +136,9 @@
                 .OrderByDescending(report => report.IncidentDate)
                 .ToList();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            errorMessage = $"Gagal mengambil data history laporan: {ex.Message}";
+            errorMessage = "Gagal mengambil data history laporan. Silakan coba lagi.";
         }
         finally
         {
