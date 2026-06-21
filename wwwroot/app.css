@@ -658,6 +658,21 @@ h1:focus {
 	word-break: break-all;
 }
 
+.report-note {
+	max-width: 520px;
+	margin: 1.25rem auto 0;
+	padding: 0.85rem 1rem;
+	border-radius: 12px;
+	background: #f1f5f9;
+	color: #475569;
+	font-size: 0.9rem;
+	line-height: 1.6;
+}
+
+.report-note strong {
+	color: #0f172a;
+}
+
 .report-success-actions {
 	display: flex;
 	flex-wrap: wrap;
