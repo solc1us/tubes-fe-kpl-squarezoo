@@ -23,50 +23,75 @@
             @errorMessage
         </div>
     }
-    else if (reports.Count == 0)
-    {
-        <div class="admin-reports-card">
-            <p>Belum ada history laporan.</p>
-        </div>
-    }
     else
     {
-        <div class="admin-reports-table-card">
-            <table class="admin-reports-table">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Judul</th>
-                        <th>Pelapor</th>
-                        <th>Terlapor</th>
-                        <th>Lokasi</th>
-                        <th>Tanggal</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
+        var filteredReports = FilteredReports;
 
-                <tbody>
-                    @for (int i = 0; i < reports.Count; i++)
-                    {
-                        var report = reports[i];
-
-                        <tr>
-                            <td>@(i + 1)</td>
-                            <td>@report.Title</td>
-                            <td>@report.ReporterName</td>
-                            <td>@report.ReportedPerson</td>
-                            <td>@report.Location</td>
-                            <td>@FormatDate(report.IncidentDate)</td>
-                            <td>
-                                <span class="@GetStatusBadgeClass(report.Status)">
-                                    @GetStatusText(report.Status)
-                                </span>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="admin-reports-filter">
+            <input class="admin-reports-search"
+                   type="search"
+                   placeholder="Cari laporan berdasarkan judul, pelapor, nomor HP, terlapor, lokasi, tanggal, atau status..."
+                   @bind="searchKeyword"
+                   @bind:event="oninput" />
         </div>
+
+        @if (reports.Count == 0)
+        {
+            <div class="admin-reports-card">
+                <p>Belum ada history laporan.</p>
+            </div>
+        }
+        else if (filteredReports.Count == 0)
+        {
+            <div class="admin-reports-card">
+                <p>Data laporan tidak ditemukan.</p>
+            </div>
+        }
+        else
+        {
+            <div class="admin-reports-table-card">
+                <table class="admin-reports-table">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Judul</th>
+                            <th>Pelapor</th>
+                            <th>Terlapor</th>
+                            <th>Lokasi</th>
+                            <th>Tanggal</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @for (int i = 0; i < filteredReports.Count; i++)
+                        {
+                            var report = filteredReports[i];
+
+                            <tr>
+                                <td>@(i + 1)</td>
+                                <td>@(report.Title ?? "-")</td>
+
+                                <td>
+                                    <div class="reporter-name">@(report.ReporterName ?? "-")</div>
+                                    <div class="reporter-phone">@(report.ReporterNoHP ?? "-")</div>
+                                </td>
+
+                                <td>@(report.ReportedPerson ?? "-")</td>
+                                <td>@(report.Location ?? "-")</td>
+                                <td>@FormatDate(report.IncidentDate)</td>
+
+                                <td>
+                                    <span class="@GetStatusBadgeClass(report.Status)">
+                                        @GetStatusText(report.Status)
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     }
 
 </section>
@@ -77,6 +102,7 @@
     private List<ReportItem> reports = new();
     private bool isLoading = true;
     private string? errorMessage;
+    private string searchKeyword = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,30 +111,73 @@
 
     private async Task LoadReports()
     {
+        isLoading = true;
+        errorMessage = null;
+
         try
         {
             var httpClient = HttpClientFactory.CreateClient();
 
-            var selesai =
-                await httpClient.GetFromJsonAsync<List<ReportItem>>(
-                    "http://localhost:5191/api/reports?status=2"
-                ) ?? new List<ReportItem>();
+            var selesaiResponse =
+                await httpClient.GetFromJsonAsync<PaginatedResponse<ReportItem>>(
+                    "http://localhost:5191/api/reports?status=2&pageSize=50"
+                );
 
-            var ditolak =
-                await httpClient.GetFromJsonAsync<List<ReportItem>>(
-                    "http://localhost:5191/api/reports?status=3"
-                ) ?? new List<ReportItem>();
+            var ditolakResponse =
+                await httpClient.GetFromJsonAsync<PaginatedResponse<ReportItem>>(
+                    "http://localhost:5191/api/reports?status=3&pageSize=50"
+                );
 
-            reports = selesai.Concat(ditolak).ToList();
+            var selesai = selesaiResponse?.Items ?? new List<ReportItem>();
+            var ditolak = ditolakResponse?.Items ?? new List<ReportItem>();
+
+            reports = selesai
+                .Concat(ditolak)
+                .OrderByDescending(report => report.IncidentDate)
+                .ToList();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = $"Gagal mengambil data history laporan: {ex.Message}";
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private List<ReportItem> FilteredReports
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                return reports;
+            }
+
+            return reports
+                .Where(MatchesSearch)
+                .ToList();
+        }
+    }
+
+    private bool MatchesSearch(ReportItem report)
+    {
+        var keyword = searchKeyword.Trim();
+
+        return ContainsSearch(report.Title, keyword)
+            || ContainsSearch(report.ReporterName, keyword)
+            || ContainsSearch(report.ReporterNoHP, keyword)
+            || ContainsSearch(report.ReportedPerson, keyword)
+            || ContainsSearch(report.Location, keyword)
+            || ContainsSearch(FormatDate(report.IncidentDate), keyword)
+            || ContainsSearch(GetStatusText(report.Status), keyword);
+    }
+
+    private static bool ContainsSearch(string? value, string keyword)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && value.Contains(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
     private string GetStatusText(int status)
@@ -138,6 +207,17 @@
         return date.HasValue
             ? date.Value.ToString("dd MMM yyyy")
             : "-";
+    }
+
+    public class PaginatedResponse<T>
+    {
+        public List<T> Items { get; set; } = new();
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalItems { get; set; }
+        public int TotalPages { get; set; }
+        public bool HasPreviousPage { get; set; }
+        public bool HasNextPage { get; set; }
     }
 
     public class ReportItem

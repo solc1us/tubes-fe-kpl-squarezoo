@@ -43,10 +43,35 @@
                     <h2>@(report.Title ?? "-")</h2>
                 </div>
 
-                <span class="@GetStatusBadgeClass(report.Status)">
-                    @GetStatusText(report.Status)
-                </span>
+                <div class="admin-detail-status-action">
+                    <span class="@GetStatusBadgeClass(report.Status)">
+                        @GetStatusText(report.Status)
+                    </span>
+
+                    @if (CanTransition(report.Status))
+                    {
+                        <button class="admin-transition-button"
+                                disabled="@isProcessing"
+                                @onclick="HandleTransition">
+                            @(isProcessing ? "Memproses..." : GetTransitionButtonText(report.Status))
+                        </button>
+                    }
+                </div>
             </div>
+
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="admin-detail-success">
+                    @successMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(transitionErrorMessage))
+            {
+                <div class="admin-detail-error">
+                    @transitionErrorMessage
+                </div>
+            }
 
             <div class="admin-detail-section">
                 <h3>Informasi Laporan</h3>
@@ -144,7 +169,10 @@
 
     private ReportDetailResponse? report;
     private bool isLoading = true;
+    private bool isProcessing = false;
     private string? errorMessage;
+    private string? successMessage;
+    private string? transitionErrorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -164,6 +192,8 @@
         {
             isLoading = true;
             errorMessage = null;
+            successMessage = null;
+            transitionErrorMessage = null;
 
             var httpClient = HttpClientFactory.CreateClient();
 
@@ -179,6 +209,98 @@
         {
             isLoading = false;
         }
+    }
+
+    private async Task HandleTransition()
+    {
+        if (report is null || string.IsNullOrWhiteSpace(Id))
+        {
+            transitionErrorMessage = "Data laporan tidak valid.";
+            return;
+        }
+
+        var nextStatus = GetNextStatus(report.Status);
+
+        if (nextStatus is null)
+        {
+            transitionErrorMessage = "Laporan ini tidak bisa dilanjutkan prosesnya.";
+            return;
+        }
+
+        try
+        {
+            isProcessing = true;
+            successMessage = null;
+            transitionErrorMessage = null;
+
+            var httpClient = HttpClientFactory.CreateClient();
+
+            var request = new HttpRequestMessage(
+                HttpMethod.Patch,
+                $"http://localhost:5191/api/reports/{Id}/transition"
+            )
+            {
+                Content = JsonContent.Create(new TransitionReportStatusRequest
+                {
+                    Status = nextStatus.Value
+                })
+            };
+
+            var response = await httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var apiError = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+                transitionErrorMessage = apiError?.Message ?? "Gagal melanjutkan proses laporan.";
+                return;
+            }
+
+            var updatedReport = await response.Content.ReadFromJsonAsync<ReportDetailResponse>();
+
+            if (updatedReport is not null)
+            {
+                report = updatedReport;
+            }
+            else
+            {
+                await LoadReport();
+            }
+
+            successMessage = "Status laporan berhasil diperbarui.";
+        }
+        catch (Exception ex)
+        {
+            transitionErrorMessage = $"Gagal melanjutkan proses laporan: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private bool CanTransition(int status)
+    {
+        return status == 0 || status == 1;
+    }
+
+    private int? GetNextStatus(int status)
+    {
+        return status switch
+        {
+            0 => 1,
+            1 => 2,
+            _ => null
+        };
+    }
+
+    private string GetTransitionButtonText(int status)
+    {
+        return status switch
+        {
+            0 => "Lanjut Proses",
+            1 => "Selesaikan Laporan",
+            _ => "Lanjut Proses"
+        };
     }
 
     private string GetStatusText(int status)
@@ -243,5 +365,15 @@
         public int Type { get; set; }
         public string? Content { get; set; }
         public string? Description { get; set; }
+    }
+
+    public class TransitionReportStatusRequest
+    {
+        public int Status { get; set; }
+    }
+
+    public class ApiErrorResponse
+    {
+        public string? Message { get; set; }
     }
 }
