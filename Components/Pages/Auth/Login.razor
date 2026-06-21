@@ -2,6 +2,7 @@
 @layout EmptyLayout
 @rendermode InteractiveServer
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @inject NavigationManager Navigation
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
@@ -64,14 +65,45 @@
 </main>
 
 @code {
+    private const string LoginEndpoint = "http://localhost:5191/api/users/login";
+    private const string UserStorageKey = "laporU_user";
+    private const string LocalPhoneNumberPrefix = "08";
+    private const int AdminRole = 1;
+    private const int PimpinanRole = 2;
+    private const int MinimumPhoneNumberLength = 10;
+    private const int MaximumPhoneNumberLength = 15;
+
+    private const string AdminDashboardRoute = "/admin/dashboard";
+    private const string PimpinanDashboardRoute = "/pimpinan/dashboard";
+    private const string RequiredFieldsErrorMessage = "No HP dan password wajib diisi.";
+    private const string PhoneNumberDigitsErrorMessage = "Nomor HP hanya boleh berisi angka.";
+    private const string PhoneNumberPrefixErrorMessage = "Nomor HP harus diawali dengan 08.";
+    private const string PhoneNumberLengthErrorMessage = "Nomor HP harus terdiri dari 10 sampai 15 angka.";
+    private const string InvalidCredentialErrorMessage = "No HP atau password salah.";
+    private const string InvalidLoginResponseErrorMessage = "Response login tidak valid.";
+    private const string UnknownRoleErrorMessage = "Role tidak dikenali.";
+    private const string ServerConnectionErrorMessage = "Gagal terhubung ke server.";
+    private const string RequestTimeoutErrorMessage = "Request login terlalu lama.";
+    private const string UnexpectedLoginErrorMessage = "Terjadi kesalahan saat login.";
+
+    private static readonly JsonSerializerOptions CaseInsensitiveJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly JsonSerializerOptions CamelCaseJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    // Field yang terhubung langsung dengan form login.
     private string noHP = string.Empty;
     private string password = string.Empty;
+
+    // Status proses dan pesan umpan balik yang ditampilkan oleh UI.
     private string? errorMessage;
     private bool isLoading;
     private bool isCheckingSession = true;
-
-    private const string LoginEndpoint = "http://localhost:5191/api/users/login";
-    private const string UserStorageKey = "laporU_user";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -80,6 +112,12 @@
             return;
         }
 
+        // Cek sesi setelah render karena localStorage memerlukan JS interop.
+        await CheckExistingSessionAsync();
+    }
+
+    private async Task CheckExistingSessionAsync()
+    {
         var storedUser = await JS.InvokeAsync<string?>("localStorage.getItem", UserStorageKey);
 
         if (string.IsNullOrWhiteSpace(storedUser))
@@ -88,30 +126,17 @@
             return;
         }
 
-        StoredLoginResponse? existingUser;
+        var existingUser = DeserializeStoredUser(storedUser);
 
-        try
-        {
-            existingUser = JsonSerializer.Deserialize<StoredLoginResponse>(storedUser, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-        }
-        catch (JsonException)
+        if (existingUser is null)
         {
             await ClearStoredUserAndShowLogin();
             return;
         }
 
-        if (existingUser?.Role == 1)
+        if (CanRedirectByRole(existingUser.Role))
         {
-            Navigation.NavigateTo("/admin/dashboard", replace: true);
-            return;
-        }
-
-        if (existingUser?.Role == 2)
-        {
-            Navigation.NavigateTo("/pimpinan/dashboard", replace: true);
+            RedirectByRole(existingUser.Role, replaceHistory: true);
             return;
         }
 
@@ -120,11 +145,11 @@
 
     private async Task HandleLogin()
     {
-        errorMessage = null;
+        ClearLoginFeedback();
 
-        if (string.IsNullOrWhiteSpace(noHP) || string.IsNullOrWhiteSpace(password))
+        // Validasi input sebelum mengirim request login ke backend.
+        if (!ValidateLoginForm())
         {
-            errorMessage = "No HP dan password wajib diisi.";
             return;
         }
 
@@ -132,52 +157,42 @@
 
         try
         {
-            var client = HttpClientFactory.CreateClient();
-
-            var request = new LoginRequest(noHP, password);
-            var response = await client.PostAsJsonAsync(LoginEndpoint, request);
+            var request = BuildLoginRequest();
+            var response = await SendLoginRequestAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
-                errorMessage = "No HP atau password salah.";
+                errorMessage = InvalidCredentialErrorMessage;
                 return;
             }
 
-            var loginResult = await response.Content.ReadFromJsonAsync<LoginResponse>();
+            var loginResult = await ReadLoginResponseAsync(response);
 
             if (loginResult is null)
             {
-                errorMessage = "Response login tidak valid.";
+                errorMessage = InvalidLoginResponseErrorMessage;
                 return;
             }
 
-            if (loginResult.Role == 1)
+            if (CanRedirectByRole(loginResult.Role))
             {
-                await StoreLoginResult(loginResult);
-                Navigation.NavigateTo("/admin/dashboard");
+                await HandleSuccessfulLoginAsync(loginResult);
                 return;
             }
 
-            if (loginResult.Role == 2)
-            {
-                await StoreLoginResult(loginResult);
-                Navigation.NavigateTo("/pimpinan/dashboard");
-                return;
-            }
-
-            errorMessage = "Role tidak dikenali.";
+            errorMessage = UnknownRoleErrorMessage;
         }
         catch (HttpRequestException)
         {
-            errorMessage = "Gagal terhubung ke server.";
+            errorMessage = ServerConnectionErrorMessage;
         }
         catch (TaskCanceledException)
         {
-            errorMessage = "Request login terlalu lama.";
+            errorMessage = RequestTimeoutErrorMessage;
         }
         catch
         {
-            errorMessage = "Terjadi kesalahan saat login.";
+            errorMessage = UnexpectedLoginErrorMessage;
         }
         finally
         {
@@ -185,14 +200,91 @@
         }
     }
 
-    private async Task StoreLoginResult(LoginResponse loginResult)
+    private bool ValidateLoginForm()
     {
-        var storedUser = JsonSerializer.Serialize(loginResult, new JsonSerializerOptions
+        errorMessage = GetValidationError();
+        return string.IsNullOrWhiteSpace(errorMessage);
+    }
+
+    private string? GetValidationError()
+    {
+        var normalizedPhoneNumber = noHP.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedPhoneNumber) || string.IsNullOrWhiteSpace(password))
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+            return RequiredFieldsErrorMessage;
+        }
+
+        if (!IsOnlyDigits(normalizedPhoneNumber))
+        {
+            return PhoneNumberDigitsErrorMessage;
+        }
+
+        if (!StartsWithLocalPhonePrefix(normalizedPhoneNumber))
+        {
+            return PhoneNumberPrefixErrorMessage;
+        }
+
+        if (!HasValidPhoneLength(normalizedPhoneNumber))
+        {
+            return PhoneNumberLengthErrorMessage;
+        }
+
+        return null;
+    }
+
+    private LoginRequest BuildLoginRequest()
+    {
+        // Trim No HP, tetapi pertahankan password sesuai input pengguna.
+        return new LoginRequest(noHP.Trim(), password);
+    }
+
+    private async Task<HttpResponseMessage> SendLoginRequestAsync(LoginRequest request)
+    {
+        var client = HttpClientFactory.CreateClient();
+        return await client.PostAsJsonAsync(LoginEndpoint, request);
+    }
+
+    private static async Task<LoginResponse?> ReadLoginResponseAsync(HttpResponseMessage response)
+    {
+        return await response.Content.ReadFromJsonAsync<LoginResponse>();
+    }
+
+    private async Task HandleSuccessfulLoginAsync(LoginResponse loginResult)
+    {
+        // Simpan response login berhasil untuk proteksi route sederhana pada MVP.
+        await SaveUserSessionAsync(loginResult);
+        RedirectByRole(loginResult.Role);
+    }
+
+    private async Task SaveUserSessionAsync(LoginResponse loginResult)
+    {
+        var storedUser = JsonSerializer.Serialize(loginResult, CamelCaseJsonOptions);
 
         await JS.InvokeVoidAsync("localStorage.setItem", UserStorageKey, storedUser);
+    }
+
+    private void RedirectByRole(int role, bool replaceHistory = false)
+    {
+        var route = role == AdminRole ? AdminDashboardRoute : PimpinanDashboardRoute;
+        Navigation.NavigateTo(route, replace: replaceHistory);
+    }
+
+    private static bool CanRedirectByRole(int role)
+    {
+        return role is AdminRole or PimpinanRole;
+    }
+
+    private static StoredLoginResponse? DeserializeStoredUser(string storedUser)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<StoredLoginResponse>(storedUser, CaseInsensitiveJsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task ClearStoredUserAndShowLogin()
@@ -201,10 +293,30 @@
         ShowLoginForm();
     }
 
+    private void ClearLoginFeedback()
+    {
+        errorMessage = null;
+    }
+
     private void ShowLoginForm()
     {
         isCheckingSession = false;
         StateHasChanged();
+    }
+
+    private static bool IsOnlyDigits(string value)
+    {
+        return Regex.IsMatch(value, @"^\d+$");
+    }
+
+    private static bool HasValidPhoneLength(string value)
+    {
+        return value.Length >= MinimumPhoneNumberLength && value.Length <= MaximumPhoneNumberLength;
+    }
+
+    private static bool StartsWithLocalPhonePrefix(string value)
+    {
+        return value.StartsWith(LocalPhoneNumberPrefix, StringComparison.Ordinal);
     }
 
     private sealed record LoginRequest(string NoHP, string Password);
