@@ -1,6 +1,261 @@
 @page "/admin/manual-entry"
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
-<h1>Manual Entry</h1>
-<p>Input laporan manual oleh admin.</p>
+<RequireLogin RequiredRole="1">
+<section class="manual-entry-page">
+    <div class="manual-entry-heading">
+        <h1>Manual Entry</h1>
+        <p>Catat laporan yang diterima melalui kanal non-digital.</p>
+    </div>
 
-@* TODO: Consider POST /api/reports for manual admin submissions later. *@
+    <div class="manual-entry-card">
+        <div class="manual-entry-form">
+            <div class="form-grid">
+                <div class="manual-entry-field">
+                    <label for="reporterName">Nama Pelapor</label>
+                    <input
+                        id="reporterName"
+                        type="text"
+                        placeholder="Masukkan nama pelapor"
+                        @bind="reporterName"
+                        @bind:event="oninput" />
+                </div>
+
+                <div class="manual-entry-field">
+                    <label for="reporterNoHP">No HP Pelapor</label>
+                    <input
+                        id="reporterNoHP"
+                        type="text"
+                        placeholder="Masukkan nomor HP"
+                        @bind="reporterNoHP"
+                        @bind:event="oninput" />
+                </div>
+
+                <div class="manual-entry-field form-field-full">
+                    <label for="title">Judul Laporan</label>
+                    <input
+                        id="title"
+                        type="text"
+                        placeholder="Masukkan judul laporan"
+                        @bind="title"
+                        @bind:event="oninput" />
+                </div>
+
+                <div class="manual-entry-field form-field-full">
+                    <label for="description">Kronologi / Deskripsi</label>
+                    <textarea
+                        id="description"
+                        rows="5"
+                        placeholder="Tuliskan kronologi laporan"
+                        @bind="description"
+                        @bind:event="oninput"></textarea>
+                </div>
+
+                <div class="manual-entry-field">
+                    <label for="reportedPerson">Pihak Terlapor</label>
+                    <input
+                        id="reportedPerson"
+                        type="text"
+                        placeholder="Masukkan pihak terlapor"
+                        @bind="reportedPerson"
+                        @bind:event="oninput" />
+                </div>
+
+                <div class="manual-entry-field">
+                    <label for="location">Lokasi Kejadian</label>
+                    <input
+                        id="location"
+                        type="text"
+                        placeholder="Masukkan lokasi kejadian"
+                        @bind="location"
+                        @bind:event="oninput" />
+                </div>
+
+                <div class="manual-entry-field">
+                    <label for="incidentDate">Tanggal Kejadian</label>
+                    <input
+                        id="incidentDate"
+                        type="datetime-local"
+                        @bind="incidentDate"
+                        @bind:format="yyyy-MM-ddTHH:mm" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="form-message form-message-error">
+                    @errorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="form-message form-message-success">
+                    <strong>@successMessage</strong>
+
+                    @if (!string.IsNullOrWhiteSpace(createdReportId) || !string.IsNullOrWhiteSpace(createdTrackingPin))
+                    {
+                        <div class="manual-entry-result">
+                            @if (!string.IsNullOrWhiteSpace(createdReportId))
+                            {
+                                <div>
+                                    <span>Report ID</span>
+                                    <strong>@createdReportId</strong>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(createdTrackingPin))
+                            {
+                                <div>
+                                    <span>Tracking PIN</span>
+                                    <strong>@createdTrackingPin</strong>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            <button
+                class="manual-entry-submit"
+                type="button"
+                disabled="@isSubmitting"
+                @onclick="HandleSubmit">
+                @(isSubmitting ? "Menyimpan..." : "Simpan Laporan")
+            </button>
+        </div>
+    </div>
+</section>
+</RequireLogin>
+
+@code {
+    private const string CreateReportEndpoint = "http://localhost:5191/api/reports";
+
+    private string reporterName = string.Empty;
+    private string reporterNoHP = string.Empty;
+    private string title = string.Empty;
+    private string description = string.Empty;
+    private string reportedPerson = string.Empty;
+    private string location = string.Empty;
+    private DateTime incidentDate = DateTime.Now;
+
+    private bool isSubmitting;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? createdReportId;
+    private string? createdTrackingPin;
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        successMessage = null;
+        createdReportId = null;
+        createdTrackingPin = null;
+
+        if (!IsFormValid())
+        {
+            errorMessage = "Semua field wajib diisi.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            var request = new CreateReportRequest(
+                reporterName.Trim(),
+                reporterNoHP.Trim(),
+                title.Trim(),
+                description.Trim(),
+                reportedPerson.Trim(),
+                location.Trim(),
+                incidentDate
+            );
+
+            var response = await client.PostAsJsonAsync(CreateReportEndpoint, request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Gagal menyimpan laporan manual.";
+                return;
+            }
+
+            CreateReportResponse? result = null;
+
+            try
+            {
+                result = await response.Content.ReadFromJsonAsync<CreateReportResponse>();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                result = null;
+            }
+            catch (NotSupportedException)
+            {
+                result = null;
+            }
+
+            successMessage = result?.Message ?? "Laporan manual berhasil disimpan.";
+            createdReportId = result?.ReportId;
+            createdTrackingPin = result?.TrackingPin;
+
+            ClearForm();
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Gagal terhubung ke server laporan.";
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request simpan laporan terlalu lama.";
+        }
+        catch
+        {
+            errorMessage = "Terjadi kesalahan saat menyimpan laporan.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private bool IsFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(reporterName)
+            && !string.IsNullOrWhiteSpace(reporterNoHP)
+            && !string.IsNullOrWhiteSpace(title)
+            && !string.IsNullOrWhiteSpace(description)
+            && !string.IsNullOrWhiteSpace(reportedPerson)
+            && !string.IsNullOrWhiteSpace(location);
+    }
+
+    private void ClearForm()
+    {
+        reporterName = string.Empty;
+        reporterNoHP = string.Empty;
+        title = string.Empty;
+        description = string.Empty;
+        reportedPerson = string.Empty;
+        location = string.Empty;
+        incidentDate = DateTime.Now;
+    }
+
+    private sealed record CreateReportRequest(
+        string ReporterName,
+        string ReporterNoHP,
+        string Title,
+        string Description,
+        string ReportedPerson,
+        string Location,
+        DateTime IncidentDate
+    );
+
+    private sealed record CreateReportResponse(
+        string? ReportId,
+        string? TrackingPin,
+        string? Message
+    );
+}

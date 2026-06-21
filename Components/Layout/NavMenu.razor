@@ -1,3 +1,8 @@
+@rendermode InteractiveServer
+@implements IDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">Lapor-U</a>
@@ -8,39 +13,80 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column sidebar-nav">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/admin/dashboard">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
-            </NavLink>
-        </div>
+        @if (IsAdminArea)
+        {
+            <div class="nav-section">
+                <div class="nav-section-title">Admin</div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/admin/laporan" Match="NavLinkMatch.All">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Laporan Masuk
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/admin/dashboard" Match="NavLinkMatch.All">
+                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/admin/laporan/history">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> History
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/admin/laporan" Match="NavLinkMatch.All">
+                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Laporan Masuk
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/admin/manual-entry">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manual Entry
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/admin/laporan/history" Match="NavLinkMatch.All">
+                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> History
+                    </NavLink>
+                </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/pimpinan/dashboard">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Pimpinan
-            </NavLink>
-        </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/admin/manual-entry" Match="NavLinkMatch.All">
+                        <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manual Entry
+                    </NavLink>
+                </div>
+            </div>
+        }
+        else if (IsPimpinanArea)
+        {
+            <div class="nav-section">
+                <div class="nav-section-title">Pimpinan</div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/pimpinan/dashboard" Match="NavLinkMatch.All">
+                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Dashboard Pimpinan
+                    </NavLink>
+                </div>
+            </div>
+        }
+
         <div class="nav-item px-3 sidebar-logout">
-            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+            <button class="nav-link logout-button" type="button" @onclick="Logout">
                 Logout
-            </NavLink>
+            </button>
         </div>
     </nav>
 </div>
+
+@code {
+    private string CurrentPath => Navigation.ToBaseRelativePath(Navigation.Uri).Trim('/');
+    private bool IsAdminArea => CurrentPath.StartsWith("admin", StringComparison.OrdinalIgnoreCase);
+    private bool IsPimpinanArea => CurrentPath.StartsWith("pimpinan", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+    }
+
+    private async Task Logout()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", "laporU_user");
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+}

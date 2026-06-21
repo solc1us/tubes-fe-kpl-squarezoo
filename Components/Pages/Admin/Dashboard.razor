@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject IHttpClientFactory HttpClientFactory
 
+<RequireLogin RequiredRole="1">
 <section class="admin-dashboard-page">
     <div class="admin-dashboard-heading">
         <h1>Dashboard Admin</h1>
@@ -50,6 +51,7 @@
         </div>
     }
 </section>
+</RequireLogin>
 
 @code {
     private ReportSummary? summary;

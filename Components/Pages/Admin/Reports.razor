@@ -3,6 +3,7 @@
 @using System.Net.Http.Json
 @inject IHttpClientFactory HttpClientFactory
 
+<RequireLogin RequiredRole="1">
 <section class="admin-reports-page">
     <div class="admin-reports-heading">
         <h1>Laporan Masuk</h1>
@@ -76,6 +77,7 @@
         </div>
     }
 </section>
+</RequireLogin>
 
 @code {
     private List<ReportItem> reports = new();
