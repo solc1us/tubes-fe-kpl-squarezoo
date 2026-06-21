@@ -1,3 +1,4 @@
+@using System.Text.Json.Serialization
 @page "/lapor/evidence"
 @layout PublicLayout
 @rendermode InteractiveServer
@@ -169,11 +170,16 @@
         submitResult = null;
     }
 
-    private sealed record AddEvidenceRequest(string Pin, int EvidenceType, string Content, string Description);
+    private sealed record AddEvidenceRequest(
+        string Pin,
+        [property: JsonPropertyName("type")] int EvidenceType,
+        string Content,
+        string Description
+    );
 
     private sealed record EvidenceSubmissionResult(
         string ReportId,
-        int EvidenceType,
+        [property: JsonPropertyName("type")] int EvidenceType,
         string Content,
         string Description
     );
