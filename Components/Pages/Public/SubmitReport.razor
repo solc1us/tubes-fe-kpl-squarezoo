@@ -2,6 +2,7 @@
 @layout PublicLayout
 @rendermode InteractiveServer
 @using System.Text
+@using System.Text.RegularExpressions
 @implements IAsyncDisposable
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
@@ -26,8 +27,8 @@
                         id="reporterName"
                         type="text"
                         placeholder="Masukkan nama lengkap"
-                        @bind="reporterName"
-                        @bind:event="oninput" />
+                        value="@reporterName"
+                        @oninput="HandleReporterNameInput" />
                 </div>
 
                 <div class="report-field">
@@ -36,8 +37,8 @@
                         id="reporterNoHP"
                         type="tel"
                         placeholder="08xxxxxxxxxx"
-                        @bind="reporterNoHP"
-                        @bind:event="oninput" />
+                        value="@reporterNoHP"
+                        @oninput="HandleReporterNoHPInput" />
                 </div>
 
                 <div class="report-field report-field-full">
@@ -66,8 +67,8 @@
                         id="reportedPerson"
                         type="text"
                         placeholder="Nama pihak yang dilaporkan"
-                        @bind="reportedPerson"
-                        @bind:event="oninput" />
+                        value="@reportedPerson"
+                        @oninput="HandleReportedPersonInput" />
                 </div>
 
                 <div class="report-field">
@@ -167,11 +168,44 @@
     {
         errorMessage = null;
 
-        if (string.IsNullOrWhiteSpace(reporterName)
-            || string.IsNullOrWhiteSpace(reporterNoHP)
-            || string.IsNullOrWhiteSpace(title)
+        if (string.IsNullOrWhiteSpace(reporterName))
+        {
+            errorMessage = "Nama pelapor wajib diisi dengan huruf dan spasi.";
+            return;
+        }
+
+        if (!IsValidReporterName(reporterName))
+        {
+            errorMessage = "Nama pelapor hanya boleh berisi huruf dan spasi.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(reporterNoHP))
+        {
+            errorMessage = "Nomor HP pelapor wajib diisi dengan angka.";
+            return;
+        }
+
+        if (!IsDigitsOnly(reporterNoHP))
+        {
+            errorMessage = "Nomor HP pelapor hanya boleh berisi angka.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(reportedPerson))
+        {
+            errorMessage = "Pihak terlapor wajib diisi dengan huruf dan spasi.";
+            return;
+        }
+
+        if (!IsValidPersonName(reportedPerson))
+        {
+            errorMessage = "Pihak terlapor hanya boleh berisi huruf dan spasi.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(title)
             || string.IsNullOrWhiteSpace(description)
-            || string.IsNullOrWhiteSpace(reportedPerson)
             || string.IsNullOrWhiteSpace(location)
             || incidentDate is null)
         {
@@ -271,6 +305,39 @@
         errorMessage = null;
         submitResult = null;
     }
+
+    private void HandleReporterNameInput(ChangeEventArgs args)
+    {
+        reporterName = SanitizeReporterName(args.Value?.ToString() ?? string.Empty);
+    }
+
+    private static string SanitizeReporterName(string value)
+        => Regex.Replace(value, @"[^\p{L} ]", string.Empty);
+
+    private static bool IsValidReporterName(string value)
+        => IsValidPersonName(value);
+
+    private void HandleReporterNoHPInput(ChangeEventArgs args)
+    {
+        reporterNoHP = SanitizeDigits(args.Value?.ToString() ?? string.Empty);
+    }
+
+    private void HandleReportedPersonInput(ChangeEventArgs args)
+    {
+        reportedPerson = SanitizePersonName(args.Value?.ToString() ?? string.Empty);
+    }
+
+    private static string SanitizePersonName(string value)
+        => Regex.Replace(value, @"[^\p{L} ]", string.Empty);
+
+    private static string SanitizeDigits(string value)
+        => Regex.Replace(value, @"\D", string.Empty);
+
+    private static bool IsValidPersonName(string value)
+        => Regex.IsMatch(value, @"^[\p{L} ]+$");
+
+    private static bool IsDigitsOnly(string value)
+        => Regex.IsMatch(value, @"^\d+$");
 
     public async ValueTask DisposeAsync()
     {
