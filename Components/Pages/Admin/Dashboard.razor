@@ -68,9 +68,9 @@
                 "http://localhost:5191/api/reports/summary"
             );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            errorMessage = $"Gagal mengambil data dashboard: {ex.Message}";
+            errorMessage = "Gagal mengambil data dashboard. Silakan coba lagi.";
         }
         finally
         {

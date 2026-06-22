@@ -103,13 +103,20 @@
 
     private const string TrackEndpoint = "http://localhost:5191/api/reports/track";
 
+    private const string MissingCredentialsMessage = "Report ID dan PIN wajib diisi.";
+    private const string InvalidCredentialsMessage = "Report ID atau PIN salah. Periksa kembali lalu coba lagi.";
+    private const string ReportNotFoundMessage = "Laporan tidak ditemukan. Pastikan Report ID sudah benar.";
+    private const string ConnectionErrorMessage = "Tidak dapat terhubung ke server. Silakan coba lagi nanti.";
+    private const string TimeoutMessage = "Permintaan memakan waktu terlalu lama. Silakan coba lagi.";
+    private const string GenericErrorMessage = "Terjadi kesalahan saat melacak laporan. Silakan coba lagi.";
+
     private async Task HandleTrack()
     {
         errorMessage = null;
 
         if (string.IsNullOrWhiteSpace(reportId) || string.IsNullOrWhiteSpace(pin))
         {
-            errorMessage = "Report ID dan PIN wajib diisi.";
+            errorMessage = MissingCredentialsMessage;
             return;
         }
 
@@ -147,10 +154,13 @@
 
             if (!response.IsSuccessStatusCode)
             {
-                var serverText = await response.Content.ReadAsStringAsync();
-                errorMessage = !string.IsNullOrWhiteSpace(serverText)
-                    ? serverText
-                    : $"Laporan tidak ditemukan atau kredensial salah. ({response.StatusCode})";
+                errorMessage = response.StatusCode switch
+                {
+                    System.Net.HttpStatusCode.Unauthorized
+                        or System.Net.HttpStatusCode.Forbidden => InvalidCredentialsMessage,
+                    System.Net.HttpStatusCode.NotFound => ReportNotFoundMessage,
+                    _ => GenericErrorMessage
+                };
                 return;
             }
 
@@ -159,25 +169,21 @@
 
             if (trackResult is null)
             {
-                errorMessage = "Response server tidak valid.";
+                errorMessage = ReportNotFoundMessage;
                 return;
             }
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            errorMessage = $"Gagal terhubung ke server: {ex.Message}";
+            errorMessage = ConnectionErrorMessage;
         }
         catch (TaskCanceledException)
         {
-            errorMessage = "Request terlalu lama. Coba lagi.";
+            errorMessage = TimeoutMessage;
         }
-        catch (System.Text.Json.JsonException)
+        catch (Exception)
         {
-            errorMessage = "Response server tidak dapat dibaca.";
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Terjadi kesalahan saat melacak laporan: {ex.Message}";
+            errorMessage = GenericErrorMessage;
         }
         finally
         {

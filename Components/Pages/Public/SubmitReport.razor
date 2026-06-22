@@ -1,7 +1,10 @@
 @page "/lapor"
 @layout PublicLayout
 @rendermode InteractiveServer
+@using System.Text
+@implements IAsyncDisposable
 @inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JS
 
 <section class="report-page">
     @if (submitResult is null)
@@ -123,8 +126,17 @@
                 </div>
             </div>
 
+            <p class="report-note">
+                Setelah meninggalkan halaman ini, Report ID dan PIN tidak akan ditampilkan lagi.
+                Unduh dan simpan terlebih dahulu, lalu pantau perkembangan laporan melalui menu
+                <strong>Lacak</strong>.
+            </p>
+
             <div class="report-success-actions">
-                <a class="landing-button landing-button-primary" href="/lacak">Lacak Laporan</a>
+                <button class="landing-button landing-button-primary" type="button" @onclick="SaveCredentials">
+                    Simpan Report ID &amp; PIN
+                </button>
+                <a class="landing-button landing-button-secondary" href="/lacak">Lacak Laporan</a>
                 <button class="landing-button landing-button-secondary" type="button" @onclick="ResetForm">
                     Buat Laporan Baru
                 </button>
@@ -147,6 +159,9 @@
     private CreateReportResponse? submitResult;
 
     private const string ReportsEndpoint = "http://localhost:5191/api/reports";
+    private const string DownloadModulePath = "./js/download.js";
+
+    private IJSObjectReference? downloadModule;
 
     private async Task HandleSubmit()
     {
@@ -215,6 +230,35 @@
         }
     }
 
+    private async Task SaveCredentials()
+    {
+        if (submitResult is null)
+        {
+            return;
+        }
+
+        var fileName = $"laporan-{submitResult.ReportId}.txt";
+        var content = BuildCredentialsText(submitResult);
+
+        var module = await GetDownloadModuleAsync();
+        await module.InvokeVoidAsync("downloadTextFile", fileName, content);
+    }
+
+    private static string BuildCredentialsText(CreateReportResponse result)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("=== Bukti Laporan ===");
+        builder.AppendLine($"Report ID : {result.ReportId}");
+        builder.AppendLine($"PIN       : {result.TrackingPin}");
+        builder.AppendLine();
+        builder.AppendLine("Simpan informasi ini baik-baik. Report ID dan PIN dibutuhkan untuk");
+        builder.AppendLine("melacak progres laporan melalui menu Lacak.");
+        return builder.ToString();
+    }
+
+    private async Task<IJSObjectReference> GetDownloadModuleAsync()
+        => downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", DownloadModulePath);
+
     private void ResetForm()
     {
         reporterName = string.Empty;
@@ -226,6 +270,23 @@
         incidentDate = null;
         errorMessage = null;
         submitResult = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (downloadModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await downloadModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit already closed; nothing to clean up.
+        }
     }
 
     private sealed record CreateReportRequest(
