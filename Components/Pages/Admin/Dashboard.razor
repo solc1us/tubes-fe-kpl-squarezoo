@@ -9,76 +9,83 @@
         <p>Menampilkan jumlah laporan berdasarkan status saat ini.</p>
     </div>
 
-    @if (isLoading)
+    @if (_isLoading)
     {
         <div class="admin-dashboard-card">
             <p>Memuat data dashboard...</p>
         </div>
     }
-    else if (!string.IsNullOrEmpty(errorMessage))
+    else if (!string.IsNullOrEmpty(_errorMessage))
     {
         <div class="admin-dashboard-error">
-            @errorMessage
+            @_errorMessage
         </div>
     }
-    else if (summary != null)
+    else if (_summary != null)
     {
         <div class="admin-summary-grid">
-            <div class="admin-summary-card admin-summary-total">
-                <span>Total Laporan</span>
-                <strong>@summary.Total</strong>
-            </div>
-
-            <div class="admin-summary-card admin-summary-diterima">
-                <span>Diterima</span>
-                <strong>@summary.Diterima</strong>
-            </div>
-
-            <div class="admin-summary-card admin-summary-diproses">
-                <span>Diproses</span>
-                <strong>@summary.Diproses</strong>
-            </div>
-
-            <div class="admin-summary-card admin-summary-selesai">
-                <span>Selesai</span>
-                <strong>@summary.Selesai</strong>
-            </div>
-
-            <div class="admin-summary-card admin-summary-ditolak">
-                <span>Ditolak</span>
-                <strong>@summary.Ditolak</strong>
-            </div>
+            @foreach (var card in GetSummaryCards())
+            {
+                <div class="admin-summary-card @card.CssClass">
+                    <span>@card.Label</span>
+                    <strong>@card.Value</strong>
+                </div>
+            }
         </div>
     }
 </section>
 </RequireLogin>
 
 @code {
-    private ReportSummary? summary;
-    private bool isLoading = true;
-    private string? errorMessage;
+    // API endpoint dashboard dipusatkan agar mudah diganti ketika konfigurasi backend sudah tersedia.
+    private const string SummaryEndpoint = "http://localhost:5191/api/reports/summary";
+    private const string LoadFailedMessage = "Gagal mengambil data dashboard. Silakan coba lagi.";
+
+    private ReportSummary? _summary;
+    private bool _isLoading = true;
+    private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadSummaryAsync();
+    }
+
+    private async Task LoadSummaryAsync()
     {
         try
         {
             var httpClient = HttpClientFactory.CreateClient();
-
-            summary = await httpClient.GetFromJsonAsync<ReportSummary>(
-                "http://localhost:5191/api/reports/summary"
-            );
+            _summary = await httpClient.GetFromJsonAsync<ReportSummary>(SummaryEndpoint);
         }
         catch (Exception)
         {
-            errorMessage = "Gagal mengambil data dashboard. Silakan coba lagi.";
+            _errorMessage = LoadFailedMessage;
         }
         finally
         {
-            isLoading = false;
+            _isLoading = false;
         }
     }
 
-    public class ReportSummary
+    // Data card dibuat dari satu sumber agar markup dashboard tidak berulang.
+    private SummaryCard[] GetSummaryCards()
+    {
+        if (_summary == null)
+        {
+            return Array.Empty<SummaryCard>();
+        }
+
+        return new[]
+        {
+            new SummaryCard("Total Laporan", _summary.Total, "admin-summary-total"),
+            new SummaryCard("Diterima", _summary.Diterima, "admin-summary-diterima"),
+            new SummaryCard("Diproses", _summary.Diproses, "admin-summary-diproses"),
+            new SummaryCard("Selesai", _summary.Selesai, "admin-summary-selesai"),
+            new SummaryCard("Ditolak", _summary.Ditolak, "admin-summary-ditolak")
+        };
+    }
+
+    public sealed class ReportSummary
     {
         public int Total { get; set; }
         public int Diterima { get; set; }
@@ -86,4 +93,6 @@
         public int Selesai { get; set; }
         public int Ditolak { get; set; }
     }
+
+    private sealed record SummaryCard(string Label, int Value, string CssClass);
 }
